@@ -82,6 +82,7 @@
 
   html {
     color-scheme: dark;
+    overflow-x: hidden;
   }
 
   body {
@@ -89,6 +90,7 @@
     font-family: "Plus Jakarta Sans", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
   }
 
   ::-webkit-scrollbar {

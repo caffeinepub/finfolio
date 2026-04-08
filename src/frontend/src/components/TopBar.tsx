@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { usePortfolioVisibilityContext } from "@/contexts/PortfolioVisibilityContext";
 import { useGetProfile } from "@/hooks/useQueries";
-import { Bell, ChevronDown, Menu, Search } from "lucide-react";
+import { Bell, ChevronDown, Eye, EyeOff, Menu, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 interface Props {
@@ -25,6 +26,7 @@ export default function TopBar({
 }: Props) {
   const { data: profile } = useGetProfile();
   const { t, i18n } = useTranslation();
+  const { isVisible, toggleVisibility } = usePortfolioVisibilityContext();
   const displayName = profile?.displayName || "there";
 
   const toggleLang = () => {
@@ -85,6 +87,24 @@ export default function TopBar({
           }
         >
           {i18n.language === "vi" ? "EN" : "VI"}
+        </button>
+
+        {/* Portfolio value visibility toggle */}
+        <button
+          type="button"
+          onClick={toggleVisibility}
+          className="h-9 px-2.5 rounded-md bg-muted border border-border text-muted-foreground hover:text-foreground hover:border-fin-green/40 transition-colors"
+          aria-label={
+            isVisible ? t("topbar.hideValues") : t("topbar.showValues")
+          }
+          data-ocid="topbar.visibility_toggle"
+          title={isVisible ? t("topbar.hideValues") : t("topbar.showValues")}
+        >
+          {isVisible ? (
+            <Eye className="w-4 h-4" />
+          ) : (
+            <EyeOff className="w-4 h-4" />
+          )}
         </button>
 
         <Button

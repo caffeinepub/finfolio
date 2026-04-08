@@ -68,6 +68,8 @@ const en = {
     greeting: "Welcome back,",
     subtitle: "Here's what's happening with your portfolio.",
     searchPlaceholder: "Search assets...",
+    hideValues: "Hide values",
+    showValues: "Show values",
     dateRanges: {
       "Last 7 Days": "Last 7 Days",
       "Last 30 Days": "Last 30 Days",
@@ -349,6 +351,8 @@ const vi: typeof en = {
     greeting: "Chào mừng trở lại,",
     subtitle: "Đây là những gì đang xảy ra với danh mục của bạn.",
     searchPlaceholder: "Tìm kiếm tài sản...",
+    hideValues: "Ẩn giá trị",
+    showValues: "Hiện giá trị",
     dateRanges: {
       "Last 7 Days": "7 ngày qua",
       "Last 30 Days": "30 ngày qua",

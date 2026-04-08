@@ -357,7 +357,7 @@ export default function TransactionsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto w-full rounded-lg">
-            <Table className="min-w-[700px]">
+            <Table className="min-w-[340px]">
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-muted-foreground text-xs pl-4 sm:pl-5">
@@ -372,16 +372,16 @@ export default function TransactionsPage() {
                   <TableHead className="text-muted-foreground text-xs text-right">
                     {t("transactions.quantityCol")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right">
+                  <TableHead className="text-muted-foreground text-xs text-right hidden sm:table-cell">
                     {t("transactions.priceCol")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right">
+                  <TableHead className="text-muted-foreground text-xs text-right hidden sm:table-cell">
                     {t("transactions.feeCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right">
                     {t("transactions.amountCol")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs">
+                  <TableHead className="text-muted-foreground text-xs hidden sm:table-cell">
                     {t("transactions.noteCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right pr-4 sm:pr-5">
@@ -423,10 +423,10 @@ export default function TransactionsPage() {
                           maximumFractionDigits: 6,
                         })}
                       </TableCell>
-                      <TableCell className="text-right text-xs sm:text-sm text-muted-foreground tabular-nums whitespace-nowrap">
+                      <TableCell className="text-right text-xs sm:text-sm text-muted-foreground tabular-nums whitespace-nowrap hidden sm:table-cell">
                         {formatCurrency(tx.price, txCurrency)}
                       </TableCell>
-                      <TableCell className="text-right text-xs text-muted-foreground tabular-nums whitespace-nowrap">
+                      <TableCell className="text-right text-xs text-muted-foreground tabular-nums whitespace-nowrap hidden sm:table-cell">
                         {formatCurrency(tx.fee, txCurrency)}
                       </TableCell>
                       <TableCell
@@ -437,7 +437,7 @@ export default function TransactionsPage() {
                         {isBuyOrDeposit ? "+" : "-"}
                         {formatCurrency(amount, txCurrency)}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[100px] truncate">
+                      <TableCell className="text-xs text-muted-foreground max-w-[100px] truncate hidden sm:table-cell">
                         {tx.note || "—"}
                       </TableCell>
                       <TableCell className="text-right pr-4 sm:pr-5">

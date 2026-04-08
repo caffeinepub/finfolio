@@ -237,19 +237,19 @@ export default function AssetsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto w-full rounded-lg">
-            <Table className="min-w-[700px]">
+            <Table className="min-w-[340px]">
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-muted-foreground text-xs pl-4 sm:pl-5">
                     {t("assets.symbolCol")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs">
+                  <TableHead className="text-muted-foreground text-xs hidden sm:table-cell">
                     {t("assets.nameCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs">
                     {t("assets.categoryCol")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs">
+                  <TableHead className="text-muted-foreground text-xs hidden sm:table-cell">
                     {t("assets.currencyCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right">
@@ -272,13 +272,13 @@ export default function AssetsPage() {
                         {displaySymbol(asset.symbol)}
                       </span>
                     </TableCell>
-                    <TableCell className="text-xs sm:text-sm text-foreground">
+                    <TableCell className="text-xs sm:text-sm text-foreground hidden sm:table-cell">
                       {asset.name}
                     </TableCell>
                     <TableCell>
                       <CategoryBadge category={asset.category} />
                     </TableCell>
-                    <TableCell className="text-xs sm:text-sm text-muted-foreground">
+                    <TableCell className="text-xs sm:text-sm text-muted-foreground hidden sm:table-cell">
                       {asset.currency}
                     </TableCell>
                     <TableCell className="text-right">

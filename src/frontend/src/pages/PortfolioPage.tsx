@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { usePortfolioVisibilityContext } from "@/contexts/PortfolioVisibilityContext";
 import { usePrices } from "@/contexts/PriceFeedContext";
 import { useGetHoldings, useGetProfile } from "@/hooks/useQueries";
 import {
@@ -41,6 +42,7 @@ export default function PortfolioPage() {
   const { data: holdings, isLoading } = useGetHoldings();
   const { prices, convert } = usePrices();
   const { data: profile } = useGetProfile();
+  const { mask } = usePortfolioVisibilityContext();
 
   const baseCurrency = profile?.baseCurrency ?? "USD";
 
@@ -129,13 +131,13 @@ export default function PortfolioPage() {
         </div>
         <div className="flex flex-col items-end gap-0.5">
           <span className="text-sm font-semibold text-foreground">
-            {formatCurrency(totalPortfolioValue, baseCurrency)}
+            {mask(formatCurrency(totalPortfolioValue, baseCurrency))}
           </span>
           <span
             className={`text-xs font-medium ${totalGainLoss >= 0 ? "text-fin-green" : "text-fin-red"}`}
           >
             {totalGainLoss >= 0 ? "+" : ""}
-            {formatCurrency(totalGainLoss, baseCurrency)} (
+            {mask(formatCurrency(totalGainLoss, baseCurrency))} (
             {formatPercent(totalGainLossPercent)})
           </span>
           <span className="text-xs text-muted-foreground">
@@ -160,19 +162,19 @@ export default function PortfolioPage() {
           </div>
         ) : (
           <div className="overflow-x-auto w-full rounded-lg">
-            <Table className="min-w-[600px]">
+            <Table className="min-w-[380px]">
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-muted-foreground text-xs pl-4 sm:pl-5 whitespace-nowrap">
                     {t("portfolio.assetCol")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs whitespace-nowrap">
+                  <TableHead className="text-muted-foreground text-xs whitespace-nowrap hidden sm:table-cell">
                     {t("portfolio.categoryCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right whitespace-nowrap">
                     {t("portfolio.quantityCol")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right whitespace-nowrap">
+                  <TableHead className="text-muted-foreground text-xs text-right whitespace-nowrap hidden sm:table-cell">
                     {t("portfolio.avgCostCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right whitespace-nowrap">
@@ -213,14 +215,14 @@ export default function PortfolioPage() {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         <CategoryBadge category={h.category} />
                       </TableCell>
                       <TableCell className="text-right text-xs sm:text-sm text-foreground tabular-nums whitespace-nowrap">
                         {formatNumber(h.quantity, 4)}
                       </TableCell>
-                      <TableCell className="text-right text-xs sm:text-sm text-muted-foreground tabular-nums whitespace-nowrap">
-                        {formatCurrency(h.avgCostInBase, baseCurrency)}
+                      <TableCell className="text-right text-xs sm:text-sm text-muted-foreground tabular-nums whitespace-nowrap hidden sm:table-cell">
+                        {mask(formatCurrency(h.avgCostInBase, baseCurrency))}
                       </TableCell>
                       <TableCell className="text-right text-xs sm:text-sm text-foreground tabular-nums">
                         <div className="flex flex-col items-end">
@@ -238,7 +240,7 @@ export default function PortfolioPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right text-xs sm:text-sm font-semibold text-foreground tabular-nums whitespace-nowrap">
-                        {formatCurrency(h.totalValueInBase, baseCurrency)}
+                        {mask(formatCurrency(h.totalValueInBase, baseCurrency))}
                       </TableCell>
                       <TableCell className="text-right pr-4 sm:pr-5">
                         <div
@@ -250,7 +252,9 @@ export default function PortfolioPage() {
                             ) : (
                               <TrendingDown className="w-3 h-3" />
                             )}
-                            {formatCurrency(h.gainLossInBase, baseCurrency)}
+                            {mask(
+                              formatCurrency(h.gainLossInBase, baseCurrency),
+                            )}
                           </span>
                           <span className="text-xs opacity-80">
                             {formatPercent(h.gainLossPercent)}

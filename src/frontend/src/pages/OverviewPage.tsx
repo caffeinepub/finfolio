@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { usePortfolioVisibilityContext } from "@/contexts/PortfolioVisibilityContext";
 import { usePrices } from "@/contexts/PriceFeedContext";
 import type { OnPricesUpdatedFn } from "@/contexts/PriceFeedContext";
 import {
@@ -131,6 +132,7 @@ function AllocationTooltip({
   baseCurrency,
   tValue,
   tShare,
+  mask,
 }: {
   active?: boolean;
   payload?: Array<{
@@ -141,6 +143,7 @@ function AllocationTooltip({
   baseCurrency: string;
   tValue: string;
   tShare: string;
+  mask: (value: string) => string;
 }) {
   if (!active || !payload || !payload.length) return null;
   const item = payload[0];
@@ -185,7 +188,7 @@ function AllocationTooltip({
         style={{ display: "flex", justifyContent: "space-between", gap: 16 }}
       >
         <span style={{ color: "oklch(0.65 0.02 240)" }}>{tValue}</span>
-        <span>{formatCurrency(value, baseCurrency)}</span>
+        <span>{mask(formatCurrency(value, baseCurrency))}</span>
       </div>
       <div
         style={{ display: "flex", justifyContent: "space-between", gap: 16 }}
@@ -204,6 +207,7 @@ function CategoryAssetTooltip({
   baseCurrency,
   tValue,
   tShare,
+  mask,
 }: {
   active?: boolean;
   payload?: Array<{
@@ -214,6 +218,7 @@ function CategoryAssetTooltip({
   baseCurrency: string;
   tValue: string;
   tShare: string;
+  mask: (value: string) => string;
 }) {
   if (!active || !payload || !payload.length) return null;
   const item = payload[0];
@@ -256,7 +261,7 @@ function CategoryAssetTooltip({
         style={{ display: "flex", justifyContent: "space-between", gap: 16 }}
       >
         <span style={{ color: "oklch(0.65 0.02 240)" }}>{tValue}</span>
-        <span>{formatCurrency(value, baseCurrency)}</span>
+        <span>{mask(formatCurrency(value, baseCurrency))}</span>
       </div>
       <div
         style={{ display: "flex", justifyContent: "space-between", gap: 16 }}
@@ -270,6 +275,7 @@ function CategoryAssetTooltip({
 
 export default function OverviewPage({ dateRange }: Props) {
   const { t } = useTranslation();
+  const { mask } = usePortfolioVisibilityContext();
   const rangeMs = getDateRangeMs(dateRange);
   const NS_PER_MS = 1_000_000n;
   const { startDate, endDate } = useMemo(() => {
@@ -624,13 +630,13 @@ export default function OverviewPage({ dateRange }: Props) {
           value={
             isLoading
               ? "—"
-              : formatCurrency(portfolioStats.totalValue, baseCurrency)
+              : mask(formatCurrency(portfolioStats.totalValue, baseCurrency))
           }
           delta={isLoading ? 0 : portfolioStats.gainLossPercent}
           deltaAmount={
             isLoading
               ? "—"
-              : formatCurrency(portfolioStats.gainLoss, baseCurrency)
+              : mask(formatCurrency(portfolioStats.gainLoss, baseCurrency))
           }
           positive={portfolioStats.gainLoss >= 0}
           index={0}
@@ -641,7 +647,7 @@ export default function OverviewPage({ dateRange }: Props) {
           value={
             isLoading
               ? "—"
-              : formatCurrency(portfolioStats.gainLoss, baseCurrency)
+              : mask(formatCurrency(portfolioStats.gainLoss, baseCurrency))
           }
           delta={isLoading ? 0 : portfolioStats.gainLossPercent}
           positive={portfolioStats.gainLoss >= 0}
@@ -653,9 +659,11 @@ export default function OverviewPage({ dateRange }: Props) {
             isLoading
               ? "—"
               : dailyChangeStats.dailyChangeAmount !== null
-                ? formatCurrency(
-                    dailyChangeStats.dailyChangeAmount,
-                    baseCurrency,
+                ? mask(
+                    formatCurrency(
+                      dailyChangeStats.dailyChangeAmount,
+                      baseCurrency,
+                    ),
                   )
                 : "N/A"
           }
@@ -838,6 +846,7 @@ export default function OverviewPage({ dateRange }: Props) {
                         baseCurrency={baseCurrency}
                         tValue={tValue}
                         tShare={tShare}
+                        mask={mask}
                       />
                     )}
                   />
@@ -848,10 +857,12 @@ export default function OverviewPage({ dateRange }: Props) {
                   {t("overview.total")} ({baseCurrency})
                 </p>
                 <p className="text-lg font-bold text-foreground">
-                  {formatCurrency(
-                    portfolioStats.totalValue,
-                    baseCurrency,
-                    true,
+                  {mask(
+                    formatCurrency(
+                      portfolioStats.totalValue,
+                      baseCurrency,
+                      true,
+                    ),
                   )}
                 </p>
               </div>
@@ -966,6 +977,7 @@ export default function OverviewPage({ dateRange }: Props) {
                               baseCurrency={baseCurrency}
                               tValue={tValue}
                               tShare={tShare}
+                              mask={mask}
                             />
                           )}
                         />

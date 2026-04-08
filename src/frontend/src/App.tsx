@@ -2,6 +2,7 @@ import type { Public } from "@/backend.d";
 import Sidebar, { type Page } from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 import { Toaster } from "@/components/ui/sonner";
+import { PortfolioVisibilityProvider } from "@/contexts/PortfolioVisibilityContext";
 import { PriceFeedProvider } from "@/contexts/PriceFeedContext";
 import { useActor } from "@/hooks/useActor";
 import { useInternetIdentity } from "@/hooks/useInternetIdentity";
@@ -71,66 +72,68 @@ function AuthenticatedApp() {
   };
 
   return (
-    <PriceFeedProvider>
-      <div className="min-h-screen bg-background flex">
-        {/* Mobile overlay */}
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 bg-black/60 z-40 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-            onKeyDown={(e) => e.key === "Escape" && setSidebarOpen(false)}
-            aria-hidden="true"
-          />
-        )}
-
-        <Sidebar
-          activePage={activePage}
-          onNavigate={handleNavigate}
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-        />
-
-        {/* Main content: full width on mobile/tablet, offset on desktop */}
-        <main className="flex-1 min-h-screen lg:ml-60 ml-0">
-          <div className="p-4 sm:p-6 max-w-screen-xl mx-auto">
-            {/* Shared TopBar — shown on all pages */}
-            <TopBar
-              dateRange={dateRange}
-              onDateRangeChange={setDateRange}
-              onToggleSidebar={() => setSidebarOpen((v) => !v)}
+    <PortfolioVisibilityProvider>
+      <PriceFeedProvider>
+        <div className="min-h-screen bg-background flex min-w-0 overflow-x-hidden w-full">
+          {/* Mobile overlay */}
+          {sidebarOpen && (
+            <div
+              className="fixed inset-0 bg-black/60 z-40 lg:hidden"
+              onClick={() => setSidebarOpen(false)}
+              onKeyDown={(e) => e.key === "Escape" && setSidebarOpen(false)}
+              aria-hidden="true"
             />
+          )}
 
-            {activePage === "overview" && (
-              <OverviewPage dateRange={dateRange} />
-            )}
-            {activePage === "portfolio" && <PortfolioPage />}
-            {activePage === "assets" && <AssetsPage />}
-            {activePage === "transactions" && <TransactionsPage />}
-            {activePage === "settings" && <SettingsPage />}
-          </div>
+          <Sidebar
+            activePage={activePage}
+            onNavigate={handleNavigate}
+            isOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+          />
 
-          {/* Footer */}
-          <footer className="px-4 sm:px-6 py-4 border-t border-border text-center">
-            <p className="text-xs text-muted-foreground">
-              &copy; {new Date().getFullYear()} Built with{" "}
-              <span className="text-fin-green">♥</span> using{" "}
-              <a
-                href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-fin-green/80 hover:text-fin-green transition-colors"
-              >
-                caffeine.ai
-              </a>
-            </p>
-          </footer>
-        </main>
+          {/* Main content: full width on mobile/tablet, offset on desktop */}
+          <main className="flex-1 min-h-screen lg:ml-60 ml-0 min-w-0 max-w-full overflow-x-hidden">
+            <div className="p-4 sm:p-6 w-full min-w-0 max-w-screen-xl mx-auto overflow-x-hidden">
+              {/* Shared TopBar — shown on all pages */}
+              <TopBar
+                dateRange={dateRange}
+                onDateRangeChange={setDateRange}
+                onToggleSidebar={() => setSidebarOpen((v) => !v)}
+              />
 
-        {showProfileSetup && (
-          <ProfileSetupModal onComplete={handleProfileComplete} />
-        )}
-      </div>
-    </PriceFeedProvider>
+              {activePage === "overview" && (
+                <OverviewPage dateRange={dateRange} />
+              )}
+              {activePage === "portfolio" && <PortfolioPage />}
+              {activePage === "assets" && <AssetsPage />}
+              {activePage === "transactions" && <TransactionsPage />}
+              {activePage === "settings" && <SettingsPage />}
+            </div>
+
+            {/* Footer */}
+            <footer className="px-4 sm:px-6 py-4 border-t border-border text-center">
+              <p className="text-xs text-muted-foreground">
+                &copy; {new Date().getFullYear()} Built with{" "}
+                <span className="text-fin-green">♥</span> using{" "}
+                <a
+                  href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-fin-green/80 hover:text-fin-green transition-colors"
+                >
+                  caffeine.ai
+                </a>
+              </p>
+            </footer>
+          </main>
+
+          {showProfileSetup && (
+            <ProfileSetupModal onComplete={handleProfileComplete} />
+          )}
+        </div>
+      </PriceFeedProvider>
+    </PortfolioVisibilityProvider>
   );
 }
 
