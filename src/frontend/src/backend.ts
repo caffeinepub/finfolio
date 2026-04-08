@@ -117,6 +117,11 @@ export interface Public {
     createdAt: bigint;
     user: Principal;
 }
+export interface MetalPrice {
+    currency: string;
+    timestamp: bigint;
+    price: number;
+}
 export interface http_header {
     value: string;
     name: string;
@@ -192,7 +197,9 @@ export interface AddTransactionInput {
 }
 export enum Category {
     Stock = "Stock",
+    RealEstate = "RealEstate",
     Cash = "Cash",
+    Commodity = "Commodity",
     Forex = "Forex",
     Crypto = "Crypto"
 }
@@ -222,6 +229,8 @@ export interface backendInterface {
     getExchangeRates(): Promise<Array<[string, number]>>;
     getHoldings(): Promise<Array<Holding>>;
     getHoldingsInCurrency(targetCurrency: string): Promise<Array<Holding>>;
+    getMetalPrice(): Promise<MetalPrice>;
+    getMetalPriceBySymbol(symbol: string): Promise<MetalPrice>;
     getPortfolioSummary(): Promise<PortfolioSummary>;
     getPortfolioSummaryInCurrency(targetCurrency: string): Promise<PortfolioSummary>;
     getProfile(): Promise<Public | null>;
@@ -234,6 +243,7 @@ export interface backendInterface {
     saveCallerUserProfile(profile: Public): Promise<void>;
     searchStocks(searchTerm: string): Promise<Array<StockSearchResult>>;
     transform(input: TransformationInput): Promise<TransformationOutput>;
+    transformMetal(input: TransformationInput): Promise<TransformationOutput>;
     transformSearch(input: TransformationInput): Promise<TransformationOutput>;
     updateAsset(asset: Public__1): Promise<void>;
     updateProfile(profile: Public): Promise<void>;
@@ -438,6 +448,34 @@ export class Backend implements backendInterface {
             return from_candid_vec_n20(this._uploadFile, this._downloadFile, result);
         }
     }
+    async getMetalPrice(): Promise<MetalPrice> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getMetalPrice();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getMetalPrice();
+            return result;
+        }
+    }
+    async getMetalPriceBySymbol(arg0: string): Promise<MetalPrice> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getMetalPriceBySymbol(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getMetalPriceBySymbol(arg0);
+            return result;
+        }
+    }
     async getPortfolioSummary(): Promise<PortfolioSummary> {
         if (this.processError) {
             try {
@@ -603,6 +641,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.transform(arg0);
+            return result;
+        }
+    }
+    async transformMetal(arg0: TransformationInput): Promise<TransformationOutput> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.transformMetal(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.transformMetal(arg0);
             return result;
         }
     }
@@ -851,13 +903,17 @@ function from_candid_record_n29(_uploadFile: (file: ExternalBlob) => Promise<Uin
 function from_candid_variant_n15(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     Stock: null;
 } | {
+    RealEstate: null;
+} | {
     Cash: null;
+} | {
+    Commodity: null;
 } | {
     Forex: null;
 } | {
     Crypto: null;
 }): Category {
-    return "Stock" in value ? Category.Stock : "Cash" in value ? Category.Cash : "Forex" in value ? Category.Forex : "Crypto" in value ? Category.Crypto : value;
+    return "Stock" in value ? Category.Stock : "RealEstate" in value ? Category.RealEstate : "Cash" in value ? Category.Cash : "Commodity" in value ? Category.Commodity : "Forex" in value ? Category.Forex : "Crypto" in value ? Category.Crypto : value;
 }
 function from_candid_variant_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     admin: null;
@@ -998,7 +1054,11 @@ function to_candid_variant_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint
 function to_candid_variant_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Category): {
     Stock: null;
 } | {
+    RealEstate: null;
+} | {
     Cash: null;
+} | {
+    Commodity: null;
 } | {
     Forex: null;
 } | {
@@ -1006,8 +1066,12 @@ function to_candid_variant_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8
 } {
     return value == Category.Stock ? {
         Stock: null
+    } : value == Category.RealEstate ? {
+        RealEstate: null
     } : value == Category.Cash ? {
         Cash: null
+    } : value == Category.Commodity ? {
+        Commodity: null
     } : value == Category.Forex ? {
         Forex: null
     } : value == Category.Crypto ? {

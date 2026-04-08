@@ -1,6 +1,10 @@
 import type { Public__1 } from "@/backend.d";
 import { Category } from "@/backend.d";
-import { AssetSearchInput } from "@/components/AssetSearchInput";
+import {
+  AssetSearchInput,
+  METAL_SYMBOLS,
+  OIL_SYMBOLS,
+} from "@/components/AssetSearchInput";
 import { CategoryBadge } from "@/components/Badges";
 import { LivePriceBadge } from "@/components/LivePriceBadge";
 import { EmptyState, PageLoader } from "@/components/LoadingStates";
@@ -60,6 +64,7 @@ function getLivePriceCurrency(
 ): string {
   if (category === Category.Crypto) return "USD";
   if (category === Category.Forex) return "USD";
+  if (category === Category.Commodity) return "USD";
   if (category === Category.Stock) {
     if (symbol.toUpperCase().endsWith(".VN")) return "VND";
     return "USD";
@@ -84,6 +89,14 @@ function displaySymbol(symbol: string): string {
   if (symbol.endsWith(".VN")) return symbol.replace(".VN", "");
   if (symbol.includes(":")) return symbol.split(":").pop()!.toUpperCase();
   return symbol;
+}
+
+/** Determine which banner to show for a commodity symbol */
+function getCommodityBannerKey(symbol: string): "metal" | "oil" | "unknown" {
+  const sym = symbol.toUpperCase();
+  if (METAL_SYMBOLS.has(sym)) return "metal";
+  if (OIL_SYMBOLS.has(sym)) return "oil";
+  return "unknown";
 }
 
 export default function AssetsPage() {
@@ -155,17 +168,25 @@ export default function AssetsPage() {
   };
 
   const isCash = form.category === Category.Cash;
+  const isCommodity = form.category === Category.Commodity;
+  const isRealEstate = form.category === Category.RealEstate;
   const isPending = addAsset.isPending || updateAsset.isPending;
 
   // Derive if price field should show
-  const showPriceField = isCash;
-  const liveSource = !isCash
-    ? form.category === Category.Crypto
-      ? "CoinGecko"
-      : form.category === Category.Forex
-        ? "Frankfurter"
-        : "Yahoo Finance"
-    : "";
+  const showPriceField = isCash || isRealEstate;
+  const liveSource =
+    !showPriceField && !isCommodity
+      ? form.category === Category.Crypto
+        ? "CoinGecko"
+        : form.category === Category.Forex
+          ? "Frankfurter"
+          : "Yahoo Finance"
+      : "";
+
+  // Commodity banner variant based on currently selected symbol
+  const commodityBannerType = isCommodity
+    ? getCommodityBannerKey(form.symbol)
+    : null;
 
   return (
     <motion.div
@@ -260,7 +281,8 @@ export default function AssetsPage() {
                       {asset.currency}
                     </TableCell>
                     <TableCell className="text-right">
-                      {asset.category === Category.Cash ? (
+                      {asset.category === Category.Cash ||
+                      asset.category === Category.RealEstate ? (
                         <span className="text-sm font-mono text-foreground">
                           {formatCurrencyVal(asset.manualPrice, asset.currency)}
                         </span>
@@ -325,13 +347,17 @@ export default function AssetsPage() {
                 <select
                   value={form.category}
                   onChange={(e) =>
-                    setForm((p) => ({
-                      ...p,
-                      category: e.target.value as Category,
-                      symbol: "",
-                      name: "",
-                      manualPrice: 0,
-                    }))
+                    setForm((p) => {
+                      const newCat = e.target.value as Category;
+                      return {
+                        ...p,
+                        category: newCat,
+                        symbol: "",
+                        name: "",
+                        currency: "USD",
+                        manualPrice: 0,
+                      };
+                    })
                   }
                   className="mt-1 w-full h-10 px-3 rounded-md bg-muted border border-border text-foreground text-sm"
                   data-ocid="assets.category.select"
@@ -340,6 +366,12 @@ export default function AssetsPage() {
                   <option value={Category.Crypto}>{t("badges.Crypto")}</option>
                   <option value={Category.Forex}>{t("badges.Forex")}</option>
                   <option value={Category.Cash}>{t("badges.Cash")}</option>
+                  <option value={Category.Commodity}>
+                    {t("badges.Commodity")}
+                  </option>
+                  <option value={Category.RealEstate}>
+                    {t("badges.RealEstate")}
+                  </option>
                 </select>
               </div>
               <div>
@@ -401,6 +433,67 @@ export default function AssetsPage() {
                   />
                 </div>
               </div>
+            ) : isCommodity ? (
+              /* Commodity: searchable dropdown from static list */
+              <div>
+                <Label className="text-foreground text-sm">
+                  {t("assets.commoditySelectLabel")} *
+                </Label>
+                <div className="mt-1">
+                  <AssetSearchInput
+                    category={Category.Commodity}
+                    onSelect={(result) =>
+                      setForm((p) => ({
+                        ...p,
+                        symbol: result.symbol,
+                        name: result.name,
+                      }))
+                    }
+                    selectedSymbol={form.symbol || undefined}
+                    selectedName={form.name || undefined}
+                    onClear={() =>
+                      setForm((p) => ({ ...p, symbol: "", name: "" }))
+                    }
+                  />
+                </div>
+              </div>
+            ) : isRealEstate ? (
+              /* Real Estate: plain text input, no API */
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-foreground text-sm">
+                    {t("common.symbol")} *
+                  </Label>
+                  <Input
+                    value={form.symbol}
+                    onChange={(e) =>
+                      setForm((p) => ({
+                        ...p,
+                        symbol: e.target.value.toUpperCase(),
+                      }))
+                    }
+                    placeholder="RE001"
+                    className="mt-1 bg-muted border-border uppercase"
+                    required
+                    data-ocid="assets.symbol.input"
+                  />
+                </div>
+                <div>
+                  <Label className="text-foreground text-sm">
+                    {t("common.name")} *
+                  </Label>
+                  <Input
+                    value={form.name}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, name: e.target.value }))
+                    }
+                    placeholder={t("assets.searchPlaceholderRealEstate")}
+                    className="mt-1 bg-muted border-border"
+                    required
+                    data-ocid="assets.name.input"
+                  />
+                </div>
+              </div>
             ) : (
               <div>
                 <Label className="text-foreground text-sm">
@@ -434,7 +527,7 @@ export default function AssetsPage() {
                 transition={{ duration: 0.2 }}
               >
                 <Label className="text-foreground text-sm">
-                  {t("assets.cashValueLabel")}
+                  {isCash ? t("assets.cashValueLabel") : t("common.price")}
                 </Label>
                 <Input
                   type="number"
@@ -451,12 +544,73 @@ export default function AssetsPage() {
                   data-ocid="assets.price.input"
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  {t("assets.cashValueHelper")}
+                  {isCash
+                    ? t("assets.cashValueHelper")
+                    : t("assets.realEstateBanner")}
                 </p>
               </motion.div>
             )}
 
-            {!showPriceField && liveSource && (
+            {/* Commodity banner: metal vs oil */}
+            {isCommodity && commodityBannerType === "metal" && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2 }}
+                className="flex items-start gap-2 rounded-lg bg-yellow-400/10 border border-yellow-400/20 px-3 py-2.5"
+              >
+                <span className="inline-block w-2 h-2 rounded-full bg-yellow-400 mt-0.5 shrink-0 animate-pulse" />
+                <p className="text-[12px] text-yellow-400 leading-snug">
+                  {t("assets.commodityBanner")}
+                </p>
+              </motion.div>
+            )}
+
+            {isCommodity && commodityBannerType === "oil" && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2 }}
+                className="flex items-start gap-2 rounded-lg bg-orange-400/10 border border-orange-400/20 px-3 py-2.5"
+              >
+                <span className="inline-block w-2 h-2 rounded-full bg-orange-400 mt-0.5 shrink-0 animate-pulse" />
+                <p className="text-[12px] text-orange-400 leading-snug">
+                  {t("assets.commodityOilBanner")}
+                </p>
+              </motion.div>
+            )}
+
+            {isCommodity &&
+              commodityBannerType === "unknown" &&
+              form.symbol && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex items-start gap-2 rounded-lg bg-yellow-400/10 border border-yellow-400/20 px-3 py-2.5"
+                >
+                  <span className="inline-block w-2 h-2 rounded-full bg-yellow-400 mt-0.5 shrink-0 animate-pulse" />
+                  <p className="text-[12px] text-yellow-400 leading-snug">
+                    {t("assets.commodityBanner")}
+                  </p>
+                </motion.div>
+              )}
+
+            {isRealEstate && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2 }}
+                className="flex items-start gap-2 rounded-lg bg-teal-400/10 border border-teal-400/20 px-3 py-2.5"
+              >
+                <span className="inline-block w-2 h-2 rounded-full bg-teal-400 mt-0.5 shrink-0" />
+                <p className="text-[12px] text-teal-400 leading-snug">
+                  {t("assets.realEstateBanner")}
+                </p>
+              </motion.div>
+            )}
+
+            {!showPriceField && !isCommodity && !isRealEstate && liveSource && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}

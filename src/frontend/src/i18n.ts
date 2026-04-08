@@ -81,6 +81,8 @@ const en = {
     Crypto: "Crypto",
     Forex: "Forex",
     Cash: "Cash",
+    Commodity: "Commodity",
+    RealEstate: "Real Estate",
     Buy: "Buy",
     Sell: "Sell",
     Deposit: "Deposit",
@@ -165,10 +167,27 @@ const en = {
     searchPlaceholderCrypto:
       "Search by name or symbol (bitcoin, BTC, ETH...)...",
     searchPlaceholderForex: "Search currency (USD, EUR, VND...)...",
+    searchPlaceholderCommodity: "Search commodity (Gold, Silver, Oil...)...",
+    searchPlaceholderRealEstate: "Property name or address...",
     searchMinChars: "Type at least 2 characters to search...",
     searchNotFound: "No results found for",
     searchNotConnected: "Not connected — please wait and try again",
     searchFailed: "Search failed — check your connection",
+    commodityBanner:
+      "Live metal price provided automatically via MetalMetric (XAU, XAG, XPT, XPD). No manual entry needed.",
+    commodityOilBanner:
+      "Live oil price provided automatically via Yahoo Finance. No manual entry needed.",
+    realEstateBanner:
+      "Manual price entry — no live price available for real estate.",
+    commoditySelectLabel: "Select Commodity",
+  },
+  commodities: {
+    XAU: "Gold",
+    XAG: "Silver",
+    XPT: "Platinum",
+    XPD: "Palladium",
+    "CL=F": "WTI Crude Oil",
+    "BZ=F": "Brent Crude Oil",
   },
   transactions: {
     title: "Transactions",
@@ -224,11 +243,12 @@ const en = {
     priceDataSubtitle: "Live market price feeds",
     autoFree: "Auto • Free",
     priceDataNote:
-      "All prices are fetched automatically every 30 seconds. Stocks use Yahoo Finance — no API key required.",
+      "All prices are fetched automatically every 30 seconds. Stocks use Yahoo Finance, metals use MetalMetric, oil uses Yahoo Finance — no API key required.",
     aboutTitle: "About FinFolio",
     version: "Version 1.0.0",
     aboutDesc1: "Decentralized portfolio management on the Internet Computer.",
-    aboutDesc2: "Track stocks, crypto, forex, and cash in one place.",
+    aboutDesc2:
+      "Track stocks, crypto, forex, commodities, and more in one place.",
     profileSaved: "Profile saved successfully",
     profileFailed: "Failed to save profile",
   },
@@ -328,6 +348,8 @@ const vi: typeof en = {
     Crypto: "Tiền mã hoá",
     Forex: "Ngoại tệ",
     Cash: "Tiền mặt",
+    Commodity: "Hàng hóa",
+    RealEstate: "Bất động sản",
     Buy: "Mua",
     Sell: "Bán",
     Deposit: "Nạp",
@@ -410,10 +432,26 @@ const vi: typeof en = {
     searchPlaceholderStock: "Nhập tên hoặc mã cổ phiếu (AAPL, VNM, TSLA...)...",
     searchPlaceholderCrypto: "Tìm theo tên hoặc mã (bitcoin, BTC, ETH...)...",
     searchPlaceholderForex: "Tìm đơn vị tiền tệ (USD, EUR, VND...)...",
+    searchPlaceholderCommodity: "Tìm hàng hóa (Vàng, Bạc, Dầu...)...",
+    searchPlaceholderRealEstate: "Tên hoặc địa chỉ bất động sản...",
     searchMinChars: "Nhập ít nhất 2 ký tự để tìm kiếm...",
     searchNotFound: "Không tìm thấy kết quả cho",
     searchNotConnected: "Chưa kết nối — vui lòng đợi và thử lại",
     searchFailed: "Tìm kiếm thất bại — kiểm tra kết nối",
+    commodityBanner:
+      "Giá kim loại được cung cấp tự động qua MetalMetric (XAU, XAG, XPT, XPD). Không cần nhập thủ công.",
+    commodityOilBanner:
+      "Giá dầu được cung cấp tự động qua Yahoo Finance. Không cần nhập thủ công.",
+    realEstateBanner: "Nhập giá thủ công — không có giá thực cho bất động sản.",
+    commoditySelectLabel: "Chọn hàng hóa",
+  },
+  commodities: {
+    XAU: "Vàng",
+    XAG: "Bạc",
+    XPT: "Bạch kim",
+    XPD: "Paladi",
+    "CL=F": "Dầu thô WTI",
+    "BZ=F": "Dầu Brent",
   },
   transactions: {
     title: "Giao dịch",
@@ -469,11 +507,12 @@ const vi: typeof en = {
     priceDataSubtitle: "Nguồn giá thị trường trực tiếp",
     autoFree: "Tự động • Miễn phí",
     priceDataNote:
-      "Tất cả giá được lấy tự động mỗi 30 giây. Cổ phiếu sử dụng Yahoo Finance — không cần API key.",
+      "Tất cả giá được lấy tự động mỗi 30 giây. Cổ phiếu dùng Yahoo Finance, kim loại dùng MetalMetric, dầu dùng Yahoo Finance — không cần API key.",
     aboutTitle: "Về FinFolio",
     version: "Phiên bản 1.0.0",
     aboutDesc1: "Quản lý danh mục phi tập trung trên Internet Computer.",
-    aboutDesc2: "Theo dõi cổ phiếu, crypto, ngoại tệ và tiền mặt tại một nơi.",
+    aboutDesc2:
+      "Theo dõi cổ phiếu, crypto, ngoại tệ, hàng hóa và nhiều hơn nữa.",
     profileSaved: "Đã lưu hồ sơ thành công",
     profileFailed: "Lưu hồ sơ thất bại",
   },

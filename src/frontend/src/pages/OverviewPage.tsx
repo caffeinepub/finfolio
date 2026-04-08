@@ -45,6 +45,8 @@ const CATEGORY_COLORS: Record<string, string> = {
   Crypto: "oklch(0.72 0.2 155)",
   Forex: "oklch(0.6 0.22 300)",
   Cash: "oklch(0.75 0.18 55)",
+  Commodity: "oklch(0.78 0.18 80)",
+  RealEstate: "oklch(0.65 0.15 180)",
 };
 
 interface Props {
@@ -183,7 +185,10 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
       const cost = holding?.totalCost ?? 0;
 
       let currentValue: number;
-      if (asset.category === Category.Cash) {
+      if (
+        asset.category === Category.Cash ||
+        asset.category === Category.RealEstate
+      ) {
         currentValue = convert(
           asset.manualPrice,
           asset.currency || "USD",
@@ -199,7 +204,10 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
         const livePrice =
           entry && entry.price > 0 ? entry.price : asset.manualPrice;
         const priceCurrency =
-          asset.category === Category.Crypto ? "USD" : asset.currency || "USD";
+          asset.category === Category.Crypto ||
+          asset.category === Category.Commodity
+            ? "USD"
+            : asset.currency || "USD";
         const valueInPriceCurrency = quantity * livePrice;
         currentValue = convert(
           valueInPriceCurrency,
@@ -241,14 +249,21 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
     let weightedChange = 0;
     let hasAnyChange = false;
     for (const asset of assets) {
-      if (asset.category === Category.Cash) continue;
+      if (
+        asset.category === Category.Cash ||
+        asset.category === Category.RealEstate
+      )
+        continue;
       const entry = prices[asset.symbol];
       if (!entry || entry.price <= 0 || entry.change24h === 0) continue;
       const holding = holdingsMap.get(String(asset.id));
       const quantity = holding?.quantity ?? 0;
       if (quantity <= 0) continue;
       const priceCurrency =
-        asset.category === Category.Crypto ? "USD" : asset.currency || "USD";
+        asset.category === Category.Crypto ||
+        asset.category === Category.Commodity
+          ? "USD"
+          : asset.currency || "USD";
       const valueInBase = convert(
         quantity * entry.price,
         priceCurrency,
@@ -313,7 +328,10 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
       );
       let total = 0;
       for (const asset of updatedAssets) {
-        if (asset.category === Category.Cash) {
+        if (
+          asset.category === Category.Cash ||
+          asset.category === Category.RealEstate
+        ) {
           total += convert(
             asset.manualPrice,
             asset.currency || "USD",
@@ -327,7 +345,8 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
           const qty = holding?.quantity ?? 0;
           if (qty <= 0) continue;
           const priceCurrency =
-            asset.category === Category.Crypto
+            asset.category === Category.Crypto ||
+            asset.category === Category.Commodity
               ? "USD"
               : asset.currency || "USD";
           total += convert(qty * livePrice, priceCurrency, baseCurrency);

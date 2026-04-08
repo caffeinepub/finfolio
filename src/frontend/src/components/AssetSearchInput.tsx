@@ -22,7 +22,31 @@ interface AssetSearchInputProps {
   onClear: () => void;
 }
 
-// Static forex list (Frankfurter has no search endpoint)
+// ── Commodity list ────────────────────────────────────────────────────────────
+export const COMMODITY_LIST: SearchResult[] = [
+  { symbol: "XAU", name: "Gold", displaySymbol: "XAU" },
+  { symbol: "XAG", name: "Silver", displaySymbol: "XAG" },
+  { symbol: "XPT", name: "Platinum", displaySymbol: "XPT" },
+  { symbol: "XPD", name: "Palladium", displaySymbol: "XPD" },
+  { symbol: "CL=F", name: "WTI Crude Oil", displaySymbol: "CL=F" },
+  { symbol: "BZ=F", name: "Brent Crude Oil", displaySymbol: "BZ=F" },
+];
+
+/** Metal symbols fetched via MetalMetric on the backend */
+export const METAL_SYMBOLS = new Set(["XAU", "XAG", "XPT", "XPD"]);
+/** Oil symbols fetched via Yahoo Finance on the backend */
+export const OIL_SYMBOLS = new Set(["CL=F", "BZ=F"]);
+
+function filterCommodities(query: string): SearchResult[] {
+  if (!query.trim()) return COMMODITY_LIST;
+  const q = query.toLowerCase();
+  return COMMODITY_LIST.filter(
+    (s) =>
+      s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q),
+  );
+}
+
+// ── Forex list ────────────────────────────────────────────────────────────────
 const FOREX_LIST: SearchResult[] = [
   { symbol: "EUR", name: "Euro" },
   { symbol: "GBP", name: "British Pound" },
@@ -50,6 +74,7 @@ function filterForex(query: string): SearchResult[] {
   );
 }
 
+// ── Crypto via CoinGecko ──────────────────────────────────────────────────────
 async function searchCrypto(query: string): Promise<SearchResult[]> {
   if (!query.trim()) {
     try {
@@ -163,6 +188,12 @@ export function AssetSearchInput({
   const triggerSearch = (q: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     setStockSearchError(null);
+
+    if (category === Category.Commodity) {
+      setResults(filterCommodities(q));
+      setDropdownOpen(true);
+      return;
+    }
 
     if (category === Category.Forex) {
       setResults(filterForex(q));
@@ -304,7 +335,9 @@ export function AssetSearchInput({
       ? t("assets.searchPlaceholderStock")
       : category === Category.Crypto
         ? t("assets.searchPlaceholderCrypto")
-        : t("assets.searchPlaceholderForex");
+        : category === Category.Commodity
+          ? t("assets.searchPlaceholderCommodity")
+          : t("assets.searchPlaceholderForex");
 
   return (
     <div ref={containerRef} className="relative">

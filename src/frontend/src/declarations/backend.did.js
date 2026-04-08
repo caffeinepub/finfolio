@@ -10,7 +10,9 @@ import { IDL } from '@icp-sdk/core/candid';
 
 export const Category = IDL.Variant({
   'Stock' : IDL.Null,
+  'RealEstate' : IDL.Null,
   'Cash' : IDL.Null,
+  'Commodity' : IDL.Null,
   'Forex' : IDL.Null,
   'Crypto' : IDL.Null,
 });
@@ -72,6 +74,11 @@ export const Holding = IDL.Record({
   'category' : Category,
   'gainLossPercent' : IDL.Float64,
   'symbol' : IDL.Text,
+});
+export const MetalPrice = IDL.Record({
+  'currency' : IDL.Text,
+  'timestamp' : IDL.Int,
+  'price' : IDL.Float64,
 });
 export const PortfolioSummary = IDL.Record({
   'totalValue' : IDL.Float64,
@@ -148,6 +155,8 @@ export const idlService = IDL.Service({
     ),
   'getHoldings' : IDL.Func([], [IDL.Vec(Holding)], ['query']),
   'getHoldingsInCurrency' : IDL.Func([IDL.Text], [IDL.Vec(Holding)], ['query']),
+  'getMetalPrice' : IDL.Func([], [MetalPrice], []),
+  'getMetalPriceBySymbol' : IDL.Func([IDL.Text], [MetalPrice], []),
   'getPortfolioSummary' : IDL.Func([], [PortfolioSummary], ['query']),
   'getPortfolioSummaryInCurrency' : IDL.Func(
       [IDL.Text],
@@ -172,6 +181,11 @@ export const idlService = IDL.Service({
       [TransformationOutput],
       ['query'],
     ),
+  'transformMetal' : IDL.Func(
+      [TransformationInput],
+      [TransformationOutput],
+      ['query'],
+    ),
   'transformSearch' : IDL.Func(
       [TransformationInput],
       [TransformationOutput],
@@ -187,7 +201,9 @@ export const idlInitArgs = [];
 export const idlFactory = ({ IDL }) => {
   const Category = IDL.Variant({
     'Stock' : IDL.Null,
+    'RealEstate' : IDL.Null,
     'Cash' : IDL.Null,
+    'Commodity' : IDL.Null,
     'Forex' : IDL.Null,
     'Crypto' : IDL.Null,
   });
@@ -249,6 +265,11 @@ export const idlFactory = ({ IDL }) => {
     'category' : Category,
     'gainLossPercent' : IDL.Float64,
     'symbol' : IDL.Text,
+  });
+  const MetalPrice = IDL.Record({
+    'currency' : IDL.Text,
+    'timestamp' : IDL.Int,
+    'price' : IDL.Float64,
   });
   const PortfolioSummary = IDL.Record({
     'totalValue' : IDL.Float64,
@@ -326,6 +347,8 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(Holding)],
         ['query'],
       ),
+    'getMetalPrice' : IDL.Func([], [MetalPrice], []),
+    'getMetalPriceBySymbol' : IDL.Func([IDL.Text], [MetalPrice], []),
     'getPortfolioSummary' : IDL.Func([], [PortfolioSummary], ['query']),
     'getPortfolioSummaryInCurrency' : IDL.Func(
         [IDL.Text],
@@ -346,6 +369,11 @@ export const idlFactory = ({ IDL }) => {
     'saveCallerUserProfile' : IDL.Func([Public], [], []),
     'searchStocks' : IDL.Func([IDL.Text], [IDL.Vec(StockSearchResult)], []),
     'transform' : IDL.Func(
+        [TransformationInput],
+        [TransformationOutput],
+        ['query'],
+      ),
+    'transformMetal' : IDL.Func(
         [TransformationInput],
         [TransformationOutput],
         ['query'],

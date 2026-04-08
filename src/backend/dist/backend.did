@@ -98,6 +98,12 @@ type PortfolioSnapshot =
    id: nat;
    totalValue: float64;
  };
+type MetalPrice = 
+ record {
+   currency: text;
+   price: float64;
+   timestamp: int;
+ };
 type Holding = 
  record {
    assetId: nat;
@@ -116,8 +122,10 @@ type Holding =
 type Category = 
  variant {
    Cash;
+   Commodity;
    Crypto;
    Forex;
+   RealEstate;
    Stock;
  };
 type AddTransactionInput = 
@@ -151,6 +159,8 @@ service : {
                                });
   getHoldings: () -> (vec Holding) query;
   getHoldingsInCurrency: (targetCurrency: text) -> (vec Holding) query;
+  getMetalPrice: () -> (MetalPrice);
+  getMetalPriceBySymbol: (symbol: text) -> (MetalPrice);
   getPortfolioSummary: () -> (PortfolioSummary) query;
   getPortfolioSummaryInCurrency: (targetCurrency: text) ->
    (PortfolioSummary) query;
@@ -165,6 +175,8 @@ service : {
   saveCallerUserProfile: (profile: Public) -> ();
   searchStocks: (searchTerm: text) -> (vec StockSearchResult);
   transform: (input: TransformationInput) -> (TransformationOutput) query;
+  transformMetal: (input: TransformationInput) ->
+   (TransformationOutput) query;
   transformSearch: (input: TransformationInput) ->
    (TransformationOutput) query;
   updateAsset: (asset: Public__1) -> ();

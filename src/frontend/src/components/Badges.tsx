@@ -12,6 +12,8 @@ const CATEGORY_CLASS: Record<Category, string> = {
   [Category.Crypto]: "bg-fin-green/15 text-fin-green border-fin-green/20",
   [Category.Forex]: "bg-fin-purple/15 text-fin-purple border-fin-purple/20",
   [Category.Cash]: "bg-fin-orange/15 text-fin-orange border-fin-orange/20",
+  [Category.Commodity]: "bg-yellow-400/15 text-yellow-400 border-yellow-400/20",
+  [Category.RealEstate]: "bg-teal-400/15 text-teal-400 border-teal-400/20",
 };
 
 export function CategoryBadge({ category, className }: CategoryBadgeProps) {

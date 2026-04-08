@@ -1,4 +1,5 @@
 import { Category, type Public__1 } from "@/backend.d";
+import { METAL_SYMBOLS, OIL_SYMBOLS } from "@/components/AssetSearchInput";
 import { useActor } from "@/hooks/useActor";
 import { useGetAssets } from "@/hooks/useQueries";
 import { convertCurrency } from "@/utils/formatters";
@@ -41,7 +42,12 @@ function getCoinGeckoId(symbol: string): string {
   return COINGECKO_ID_MAP[symbol.toUpperCase()] ?? symbol.toLowerCase();
 }
 
-export type PriceSource = "coingecko" | "frankfurter" | "yahoo" | "manual";
+export type PriceSource =
+  | "coingecko"
+  | "frankfurter"
+  | "yahoo"
+  | "manual"
+  | "metalmetric";
 export type PriceStatus = "live" | "stale" | "error" | "no-key";
 
 export interface PriceEntry {
@@ -315,6 +321,17 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
     const cryptoAssets = assets.filter((a) => a.category === Category.Crypto);
     const forexAssets = assets.filter((a) => a.category === Category.Forex);
     const stockAssets = assets.filter((a) => a.category === Category.Stock);
+    const commodityAssets = assets.filter(
+      (a) => a.category === Category.Commodity,
+    );
+
+    // Split commodity assets by price source
+    const metalAssets = commodityAssets.filter((a) =>
+      METAL_SYMBOLS.has(a.symbol.toUpperCase()),
+    );
+    const oilAssets = commodityAssets.filter((a) =>
+      OIL_SYMBOLS.has(a.symbol.toUpperCase()),
+    );
 
     // Collect all asset currencies for exchange rate prefetch
     const assetCurrencies = [
@@ -326,35 +343,95 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
 
     const cryptoSymbols = cryptoAssets.map((a) => a.symbol);
 
-    const [cryptoBatchResult, forexResults, stockResults, freshRates] =
-      await Promise.all([
-        fetchCryptoPrices(cryptoSymbols),
-        Promise.all(
-          forexAssets.map(async (asset) => {
-            const result = await fetchForexPrice(asset.symbol);
-            return { asset, result };
-          }),
-        ),
-        Promise.all(
-          stockAssets.map(async (asset) => {
-            if (actor?.getStockPrice) {
-              try {
-                const res = await actor.getStockPrice(asset.symbol);
-                if (res.ok && res.price > 0) {
-                  return {
-                    asset,
-                    result: { price: res.price, change24h: res.change24h },
-                  };
-                }
-              } catch {
-                // fall through
+    // Build per-metal fetch promises using getMetalPriceBySymbol
+    const metalFetchPromises = metalAssets.map(async (asset) => {
+      const sym = asset.symbol.toUpperCase();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const actorAny = actor as any;
+      if (actor && typeof actorAny.getMetalPriceBySymbol === "function") {
+        try {
+          const res = await actorAny.getMetalPriceBySymbol(sym);
+          if (res && typeof res.price === "number" && res.price > 0) {
+            return {
+              asset,
+              result: { price: res.price as number, change24h: 0 },
+            };
+          }
+        } catch {
+          // fall through to cache/manual
+        }
+      } else if (actor?.getMetalPrice) {
+        // Fallback: legacy getMetalPrice() for XAU only
+        try {
+          const res = await actor.getMetalPrice();
+          if (res && typeof res.price === "number" && res.price > 0) {
+            return {
+              asset,
+              result: { price: res.price as number, change24h: 0 },
+            };
+          }
+        } catch {
+          // fall through
+        }
+      }
+      return { asset, result: null };
+    });
+
+    // Oil symbols via Yahoo Finance (same path as stocks)
+    const oilFetchPromises = oilAssets.map(async (asset) => {
+      if (actor?.getStockPrice) {
+        try {
+          const res = await actor.getStockPrice(asset.symbol);
+          if (res.ok && res.price > 0) {
+            return {
+              asset,
+              result: { price: res.price, change24h: res.change24h },
+            };
+          }
+        } catch {
+          // fall through
+        }
+      }
+      return { asset, result: null };
+    });
+
+    const [
+      cryptoBatchResult,
+      forexResults,
+      stockResults,
+      freshRates,
+      metalResults,
+      oilResults,
+    ] = await Promise.all([
+      fetchCryptoPrices(cryptoSymbols),
+      Promise.all(
+        forexAssets.map(async (asset) => {
+          const result = await fetchForexPrice(asset.symbol);
+          return { asset, result };
+        }),
+      ),
+      Promise.all(
+        stockAssets.map(async (asset) => {
+          if (actor?.getStockPrice) {
+            try {
+              const res = await actor.getStockPrice(asset.symbol);
+              if (res.ok && res.price > 0) {
+                return {
+                  asset,
+                  result: { price: res.price, change24h: res.change24h },
+                };
               }
+            } catch {
+              // fall through
             }
-            return { asset, result: null };
-          }),
-        ),
-        fetchExchangeRates(allCurrenciesToFetch),
-      ]);
+          }
+          return { asset, result: null };
+        }),
+      ),
+      fetchExchangeRates(allCurrenciesToFetch),
+      Promise.all(metalFetchPromises),
+      Promise.all(oilFetchPromises),
+    ]);
 
     // Update exchange rates
     setExchangeRates(freshRates);
@@ -366,7 +443,6 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
     for (const asset of cryptoAssets) {
       const result = cryptoBatchResult[asset.symbol];
       if (result && result.price > 0) {
-        // Live price success — update cache
         const entry: PriceEntry = {
           price: result.price,
           change24h: result.change24h,
@@ -377,7 +453,6 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
         newPrices[asset.symbol] = entry;
         pricesCacheRef.current[asset.symbol] = entry;
       } else {
-        // Live fetch failed — use cached price if available
         const cached = pricesCacheRef.current[asset.symbol];
         if (cached && cached.price > 0) {
           console.warn(
@@ -389,7 +464,6 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
             updatedAt: now,
           };
         } else if (asset.manualPrice > 0) {
-          // Last resort: use manualPrice only if it's non-zero
           newPrices[asset.symbol] = {
             price: asset.manualPrice,
             change24h: 0,
@@ -398,7 +472,6 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
             updatedAt: now,
           };
         } else {
-          // Truly no data — mark as error but preserve 0 so UI can show "N/A"
           newPrices[asset.symbol] = {
             price: 0,
             change24h: 0,
@@ -470,6 +543,93 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
 
     // ── Cash ──
     for (const asset of assets.filter((a) => a.category === Category.Cash)) {
+      newPrices[asset.symbol] = {
+        price: asset.manualPrice,
+        change24h: 0,
+        source: "manual",
+        status: "live",
+        updatedAt: now,
+      };
+    }
+
+    // ── Commodity: Metals (XAU, XAG, XPT, XPD) via MetalMetric ──
+    for (const { asset, result } of metalResults) {
+      const key = asset.symbol;
+      if (result && result.price > 0) {
+        const entry: PriceEntry = {
+          price: result.price,
+          change24h: 0,
+          source: "metalmetric",
+          status: "live",
+          updatedAt: now,
+        };
+        newPrices[key] = entry;
+        pricesCacheRef.current[key] = entry;
+      } else {
+        const cached = pricesCacheRef.current[key];
+        if (cached && cached.price > 0) {
+          newPrices[key] = { ...cached, status: "stale", updatedAt: now };
+        } else if (asset.manualPrice > 0) {
+          newPrices[key] = {
+            price: asset.manualPrice,
+            change24h: 0,
+            source: "manual",
+            status: "error",
+            updatedAt: now,
+          };
+        } else {
+          newPrices[key] = {
+            price: 0,
+            change24h: 0,
+            source: "manual",
+            status: "error",
+            updatedAt: now,
+          };
+        }
+      }
+    }
+
+    // ── Commodity: Oil (CL=F, BZ=F) via Yahoo Finance ──
+    for (const { asset, result } of oilResults) {
+      const key = asset.symbol;
+      if (result && result.price > 0) {
+        const entry: PriceEntry = {
+          price: result.price,
+          change24h: result.change24h,
+          source: "yahoo",
+          status: "live",
+          updatedAt: now,
+        };
+        newPrices[key] = entry;
+        pricesCacheRef.current[key] = entry;
+      } else {
+        const cached = pricesCacheRef.current[key];
+        if (cached && cached.price > 0) {
+          newPrices[key] = { ...cached, status: "stale", updatedAt: now };
+        } else if (asset.manualPrice > 0) {
+          newPrices[key] = {
+            price: asset.manualPrice,
+            change24h: 0,
+            source: "manual",
+            status: "error",
+            updatedAt: now,
+          };
+        } else {
+          newPrices[key] = {
+            price: 0,
+            change24h: 0,
+            source: "manual",
+            status: "error",
+            updatedAt: now,
+          };
+        }
+      }
+    }
+
+    // ── Real Estate (manual price only) ──
+    for (const asset of assets.filter(
+      (a) => a.category === Category.RealEstate,
+    )) {
       newPrices[asset.symbol] = {
         price: asset.manualPrice,
         change24h: 0,

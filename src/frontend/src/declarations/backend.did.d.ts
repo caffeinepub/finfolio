@@ -23,7 +23,9 @@ export interface AddTransactionInput {
   'price' : number,
 }
 export type Category = { 'Stock' : null } |
+  { 'RealEstate' : null } |
   { 'Cash' : null } |
+  { 'Commodity' : null } |
   { 'Forex' : null } |
   { 'Crypto' : null };
 export interface Holding {
@@ -39,6 +41,11 @@ export interface Holding {
   'category' : Category,
   'gainLossPercent' : number,
   'symbol' : string,
+}
+export interface MetalPrice {
+  'currency' : string,
+  'timestamp' : bigint,
+  'price' : number,
 }
 export interface PortfolioSnapshot {
   'id' : bigint,
@@ -132,6 +139,8 @@ export interface _SERVICE {
   'getExchangeRates' : ActorMethod<[], Array<[string, number]>>,
   'getHoldings' : ActorMethod<[], Array<Holding>>,
   'getHoldingsInCurrency' : ActorMethod<[string], Array<Holding>>,
+  'getMetalPrice' : ActorMethod<[], MetalPrice>,
+  'getMetalPriceBySymbol' : ActorMethod<[string], MetalPrice>,
   'getPortfolioSummary' : ActorMethod<[], PortfolioSummary>,
   'getPortfolioSummaryInCurrency' : ActorMethod<[string], PortfolioSummary>,
   'getProfile' : ActorMethod<[], [] | [Public]>,
@@ -144,6 +153,7 @@ export interface _SERVICE {
   'saveCallerUserProfile' : ActorMethod<[Public], undefined>,
   'searchStocks' : ActorMethod<[string], Array<StockSearchResult>>,
   'transform' : ActorMethod<[TransformationInput], TransformationOutput>,
+  'transformMetal' : ActorMethod<[TransformationInput], TransformationOutput>,
   'transformSearch' : ActorMethod<[TransformationInput], TransformationOutput>,
   'updateAsset' : ActorMethod<[Public__1], undefined>,
   'updateProfile' : ActorMethod<[Public], undefined>,

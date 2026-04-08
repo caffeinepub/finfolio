@@ -147,6 +147,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="space-y-4">
+          {/* 3-col first row */}
           <div className="grid grid-cols-3 gap-3 text-center">
             <div className="bg-muted/50 rounded-lg p-3">
               <div className="flex items-center justify-center gap-1 mb-1">
@@ -177,6 +178,34 @@ export default function SettingsPage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-fin-green animate-pulse inline-block" />
                 <span className="text-xs font-semibold text-foreground">
                   {t("badges.Stock")}
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">Yahoo Finance</p>
+              <p className="text-[10px] text-fin-green mt-0.5">
+                {t("settings.autoFree")}
+              </p>
+            </div>
+          </div>
+
+          {/* 2-col second row: Metals + Oil */}
+          <div className="grid grid-cols-2 gap-3 text-center">
+            <div className="bg-muted/50 rounded-lg p-3">
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse inline-block" />
+                <span className="text-xs font-semibold text-foreground">
+                  {t("badges.Commodity")} — XAU, XAG, XPT, XPD
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">MetalMetric</p>
+              <p className="text-[10px] text-fin-green mt-0.5">
+                {t("settings.autoFree")}
+              </p>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-3">
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse inline-block" />
+                <span className="text-xs font-semibold text-foreground">
+                  {t("badges.Commodity")} — CL=F, BZ=F
                 </span>
               </div>
               <p className="text-[11px] text-muted-foreground">Yahoo Finance</p>

@@ -35,6 +35,11 @@ export interface Public {
     createdAt: bigint;
     user: Principal;
 }
+export interface MetalPrice {
+    currency: string;
+    timestamp: bigint;
+    price: number;
+}
 export interface http_header {
     value: string;
     name: string;
@@ -110,7 +115,9 @@ export interface AddTransactionInput {
 }
 export enum Category {
     Stock = "Stock",
+    RealEstate = "RealEstate",
     Cash = "Cash",
+    Commodity = "Commodity",
     Forex = "Forex",
     Crypto = "Crypto"
 }
@@ -139,6 +146,8 @@ export interface backendInterface {
     getExchangeRates(): Promise<Array<[string, number]>>;
     getHoldings(): Promise<Array<Holding>>;
     getHoldingsInCurrency(targetCurrency: string): Promise<Array<Holding>>;
+    getMetalPrice(): Promise<MetalPrice>;
+    getMetalPriceBySymbol(symbol: string): Promise<MetalPrice>;
     getPortfolioSummary(): Promise<PortfolioSummary>;
     getPortfolioSummaryInCurrency(targetCurrency: string): Promise<PortfolioSummary>;
     getProfile(): Promise<Public | null>;
@@ -151,6 +160,7 @@ export interface backendInterface {
     saveCallerUserProfile(profile: Public): Promise<void>;
     searchStocks(searchTerm: string): Promise<Array<StockSearchResult>>;
     transform(input: TransformationInput): Promise<TransformationOutput>;
+    transformMetal(input: TransformationInput): Promise<TransformationOutput>;
     transformSearch(input: TransformationInput): Promise<TransformationOutput>;
     updateAsset(asset: Public__1): Promise<void>;
     updateProfile(profile: Public): Promise<void>;

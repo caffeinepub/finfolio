@@ -24,6 +24,8 @@ actor {
       #Crypto;
       #Forex;
       #Cash;
+      #Commodity;
+      #RealEstate;
     };
     public type Public = {
       id : Nat;
@@ -158,6 +160,13 @@ actor {
     exchange : Text;
   };
 
+  // Metal price result type (MetalMetric API)
+  type MetalPrice = {
+    price : Float;
+    currency : Text;
+    timestamp : Int;
+  };
+
   // Input type for addTransaction that accepts optional currency
   type AddTransactionInput = {
     id : Nat;
@@ -187,6 +196,16 @@ actor {
   // 30-minute cache TTL in nanoseconds
   let exchangeRateCacheTtl : Int = 30 * 60 * 1_000_000_000;
 
+  // Legacy stable vars kept for backward-compatibility (migration from single-symbol cache)
+  var metalPriceCache : ?MetalPrice = null;
+  var metalPriceCacheTime : Int = 0;
+
+  // Metal price cache per symbol (e.g. XAU, XAG, XPT, XPD)
+  let metalPriceCacheMap = Map.empty<Text, MetalPrice>();
+  let metalPriceCacheTimeMap = Map.empty<Text, Int>();
+  // 5-minute cache TTL in nanoseconds
+  let metalPriceCacheTtl : Int = 5 * 60 * 1_000_000_000;
+
   // Authorization
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
@@ -198,6 +217,11 @@ actor {
 
   // Transform for search HTTP outcalls
   public query func transformSearch(input : HttpOutcall.TransformationInput) : async HttpOutcall.TransformationOutput {
+    HttpOutcall.transform(input);
+  };
+
+  // Transform for metal price HTTP outcalls
+  public query func transformMetal(input : HttpOutcall.TransformationInput) : async HttpOutcall.TransformationOutput {
     HttpOutcall.transform(input);
   };
 
@@ -664,6 +688,74 @@ actor {
     };
   };
 
+  // -------------------------------------------------------
+  // Metal price via MetalMetric API (server-side outcall)
+  // Supports XAU (gold), XAG (silver), XPT (platinum), XPD (palladium)
+  // Endpoint: GET https://metalmetric.com/api/v1/price/{symbol}/USD
+  // Response: {"price": 2300.50, "currency": "USD", ...}
+  // Each symbol is cached independently for 5 minutes
+  // -------------------------------------------------------
+  public shared func getMetalPriceBySymbol(symbol : Text) : async MetalPrice {
+    let upperSymbol = symbol.toUpper();
+    let now = Time.now();
+    // Check per-symbol cache
+    switch (metalPriceCacheMap.get(upperSymbol)) {
+      case (?cached) {
+        let cacheTime = switch (metalPriceCacheTimeMap.get(upperSymbol)) {
+          case (?t) { t };
+          case (null) { 0 };
+        };
+        if (now - cacheTime <= metalPriceCacheTtl) {
+          return cached;
+        };
+      };
+      case (null) {};
+    };
+    // Cache miss or stale — fetch fresh price
+    let lowerSymbol = symbol.toLower();
+    let url = "https://metalmetric.com/api/v1/price/" # lowerSymbol # "/USD";
+    try {
+      let body = await HttpOutcall.httpGetRequest(
+        url,
+        [{ name = "Accept"; value = "application/json" }],
+        transformMetal,
+      );
+      let price = switch (extractFloat(body, "price")) {
+        case (null) {
+          // Return stale cache if available, else error value
+          switch (metalPriceCacheMap.get(upperSymbol)) {
+            case (?cached) { return cached };
+            case (null) { return { price = 0.0; currency = "USD"; timestamp = now } };
+          };
+        };
+        case (?p) {
+          if (p == 0.0) {
+            switch (metalPriceCacheMap.get(upperSymbol)) {
+              case (?cached) { return cached };
+              case (null) { return { price = 0.0; currency = "USD"; timestamp = now } };
+            };
+          };
+          p;
+        };
+      };
+      let result : MetalPrice = { price; currency = "USD"; timestamp = now };
+      metalPriceCacheMap.add(upperSymbol, result);
+      metalPriceCacheTimeMap.add(upperSymbol, now);
+      result;
+    } catch (_) {
+      // Return stale cache if available, else zero
+      switch (metalPriceCacheMap.get(upperSymbol)) {
+        case (?cached) { cached };
+        case (null) { { price = 0.0; currency = "USD"; timestamp = now } };
+      };
+    };
+  };
+
+  // Backward-compatible: fetches gold (XAU/USD) price — delegates to getMetalPriceBySymbol
+  public shared func getMetalPrice() : async MetalPrice {
+    await getMetalPriceBySymbol("XAU");
+  };
+
   // Internal: look up rate for a currency vs USD from the cache
   // Returns 1.0 if not found (treats unknown as USD)
   func getRateVsUsd(currency : Text) : Float {
@@ -1107,6 +1199,8 @@ actor {
         case (#Crypto) { "Crypto" };
         case (#Forex) { "Forex" };
         case (#Cash) { "Cash" };
+        case (#Commodity) { "Commodity" };
+        case (#RealEstate) { "RealEstate" };
       };
       switch (allocationMap.get(catKey)) {
         case (null) {
@@ -1169,6 +1263,8 @@ actor {
         case (#Crypto) { "Crypto" };
         case (#Forex) { "Forex" };
         case (#Cash) { "Cash" };
+        case (#Commodity) { "Commodity" };
+        case (#RealEstate) { "RealEstate" };
       };
       let convertedValue = if (targetCurrency == "" or holding.currency == targetCurrency) {
         holding.totalValue;

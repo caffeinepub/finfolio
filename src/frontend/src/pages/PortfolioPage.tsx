@@ -28,6 +28,7 @@ function getLivePriceCurrency(
 ): string {
   if (category === Category.Crypto) return "USD";
   if (category === Category.Forex) return "USD";
+  if (category === Category.Commodity) return "USD";
   if (category === Category.Stock) {
     if (symbol.toUpperCase().endsWith(".VN")) return "VND";
     return "USD";
