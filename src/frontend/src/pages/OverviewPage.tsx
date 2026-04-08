@@ -577,17 +577,74 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{
-                      background: "oklch(0.17 0.035 240)",
-                      border: "1px solid oklch(0.24 0.04 240)",
-                      borderRadius: "8px",
-                      color: "oklch(0.93 0.015 240)",
-                      fontSize: 12,
+                    content={({ active, payload }) => {
+                      if (!active || !payload || !payload.length) return null;
+                      const item = payload[0];
+                      const name = item.name as string;
+                      const value = item.value as number;
+                      const pct = (item.payload as { percentage: number })
+                        .percentage;
+                      const color = (CATEGORY_COLORS[name] ??
+                        "oklch(0.6 0.1 240)") as string;
+                      return (
+                        <div
+                          style={{
+                            background: "oklch(0.17 0.035 240)",
+                            border: "1px solid oklch(0.24 0.04 240)",
+                            borderRadius: 8,
+                            color: "oklch(0.93 0.015 240)",
+                            fontSize: 12,
+                            padding: "8px 12px",
+                            minWidth: 160,
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                              marginBottom: 4,
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: "50%",
+                                background: color,
+                                display: "inline-block",
+                                flexShrink: 0,
+                              }}
+                            />
+                            <span style={{ fontWeight: 600 }}>{name}</span>
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              gap: 16,
+                            }}
+                          >
+                            <span style={{ color: "oklch(0.65 0.02 240)" }}>
+                              Value
+                            </span>
+                            <span>{formatCurrency(value, baseCurrency)}</span>
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              gap: 16,
+                            }}
+                          >
+                            <span style={{ color: "oklch(0.65 0.02 240)" }}>
+                              Share
+                            </span>
+                            <span>{pct.toFixed(1)}%</span>
+                          </div>
+                        </div>
+                      );
                     }}
-                    formatter={(v: number) => [
-                      formatCurrency(v, baseCurrency),
-                      "Value",
-                    ]}
                   />
                 </PieChart>
               </ResponsiveContainer>
