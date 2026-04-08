@@ -18,6 +18,7 @@ import type { OnPricesUpdatedFn } from "@/contexts/PriceFeedContext";
 import {
   useAddSnapshot,
   useGetAssets,
+  useGetProfile,
   useGetSnapshots,
   useGetTransactions,
 } from "@/hooks/useQueries";
@@ -61,7 +62,6 @@ function getDateRangeMs(label: string): number {
   return (map[label] ?? 30) * 24 * 60 * 60 * 1000;
 }
 
-/** Calculate per-asset holdings (quantity) from transactions */
 function calcHoldingsQuantity(
   assets: Public__1[],
   transactions: {
@@ -70,18 +70,29 @@ function calcHoldingsQuantity(
     quantity: number;
     price: number;
     fee: number;
+    currency?: string;
   }[],
+  convert: (amount: number, from: string, to: string) => number,
+  baseCurrency: string,
 ): Map<bigint, { quantity: number; totalCost: number }> {
   const map = new Map<bigint, { quantity: number; totalCost: number }>();
   for (const asset of assets) {
     map.set(asset.id, { quantity: 0, totalCost: 0 });
   }
   for (const tx of transactions) {
+    const asset = assets.find((a) => a.id === tx.assetId);
+    const txCurrency = tx.currency ?? asset?.currency ?? "USD";
     const current = map.get(tx.assetId) ?? { quantity: 0, totalCost: 0 };
     if (tx.txType === TxType.Buy || tx.txType === TxType.Deposit) {
+      // Convert cost to baseCurrency
+      const costInBase = convert(
+        tx.quantity * tx.price + tx.fee,
+        txCurrency,
+        baseCurrency,
+      );
       map.set(tx.assetId, {
         quantity: current.quantity + tx.quantity,
-        totalCost: current.totalCost + tx.quantity * tx.price + tx.fee,
+        totalCost: current.totalCost + costInBase,
       });
     } else if (tx.txType === TxType.Sell || tx.txType === TxType.Withdraw) {
       map.set(tx.assetId, {
@@ -93,14 +104,10 @@ function calcHoldingsQuantity(
   return map;
 }
 
-const SNAPSHOT_THROTTLE_MS = 5 * 60 * 1000; // 5 minutes — module-level constant
+const SNAPSHOT_THROTTLE_MS = 5 * 60 * 1000;
 
 export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
   const rangeMs = getDateRangeMs(dateRange);
-
-  // ICP backend stores timestamps as nanoseconds — convert ms → ns by × 1_000_000
-  // Memoize on dateRange label to avoid recalculating on every render tick,
-  // which would cause the query key to change constantly and loop.
   const NS_PER_MS = 1_000_000n;
   const { startDate, endDate } = useMemo(() => {
     const now = Date.now();
@@ -108,9 +115,8 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
       startDate: BigInt(now - rangeMs) * NS_PER_MS,
       endDate: BigInt(now) * NS_PER_MS,
     };
-    // re-compute only when the range label (and derived rangeMs) changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rangeMs]); // stable: rangeMs only changes when dateRange label changes
+  }, [rangeMs]);
 
   const { data: transactions, isLoading: txLoading } = useGetTransactions();
   const { data: assets, isLoading: assetsLoading } = useGetAssets();
@@ -118,13 +124,20 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
     startDate,
     endDate,
   );
-  const { prices, isLoading: pricesLoading, onPricesUpdated } = usePrices();
+  const {
+    prices,
+    isLoading: pricesLoading,
+    convert,
+    onPricesUpdated,
+  } = usePrices();
+  const { data: profile } = useGetProfile();
   const addSnapshot = useAddSnapshot();
 
-  // Track whether we've already saved a snapshot in this session (throttle per 5 min)
+  // baseCurrency from user profile, fallback USD
+  const baseCurrency = profile?.baseCurrency ?? "USD";
+
   const lastSnapshotTimeRef = useRef<number>(0);
 
-  // Build asset map for display in recent transactions
   const assetMap = useMemo(() => {
     const m = new Map<string, string>();
     if (assets) {
@@ -133,14 +146,19 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
     return m;
   }, [assets]);
 
-  // Calculate holdings quantity map from transactions
+  // Build asset lookup map
+  const assetById = useMemo(() => {
+    const m = new Map<bigint, Public__1>();
+    if (assets) for (const a of assets) m.set(a.id, a);
+    return m;
+  }, [assets]);
+
   const holdingsMap = useMemo(() => {
     if (!assets || !transactions)
       return new Map<bigint, { quantity: number; totalCost: number }>();
-    return calcHoldingsQuantity(assets, transactions);
-  }, [assets, transactions]);
+    return calcHoldingsQuantity(assets, transactions, convert, baseCurrency);
+  }, [assets, transactions, convert, baseCurrency]);
 
-  // Calculate live portfolio statistics from assets + live prices + transactions
   const portfolioStats = useMemo(() => {
     if (!assets || assets.length === 0) {
       return {
@@ -167,14 +185,28 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
 
       let currentValue: number;
       if (asset.category === Category.Cash) {
-        // Cash: manualPrice is the total cash value (no quantity needed)
-        currentValue = asset.manualPrice;
-        totalCost += asset.manualPrice; // cost basis = current value for cash
+        // Convert cash value to baseCurrency
+        currentValue = convert(
+          asset.manualPrice,
+          asset.currency || "USD",
+          baseCurrency,
+        );
+        totalCost += convert(
+          asset.manualPrice,
+          asset.currency || "USD",
+          baseCurrency,
+        );
       } else {
         const entry = prices[asset.symbol];
         const livePrice = entry?.price ?? asset.manualPrice;
-        currentValue = quantity * livePrice;
-        totalCost += cost;
+        // Convert value from asset currency to baseCurrency
+        const valueInAssetCurrency = quantity * livePrice;
+        currentValue = convert(
+          valueInAssetCurrency,
+          asset.currency || "USD",
+          baseCurrency,
+        );
+        totalCost += cost; // cost already in baseCurrency (via calcHoldingsQuantity)
       }
 
       totalValue += currentValue;
@@ -200,52 +232,53 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
       gainLossPercent,
       allocationByCategory,
     };
-  }, [assets, holdingsMap, prices]);
+  }, [assets, holdingsMap, prices, convert, baseCurrency]);
 
-  // Weighted average 24h change across all live-priced assets
   const dailyChangeStats = useMemo(() => {
     if (!assets || assets.length === 0 || portfolioStats.totalValue === 0) {
       return { dailyChangeAmount: null, dailyChangePercent: null };
     }
-
     let weightedChange = 0;
     let hasAnyChange = false;
-
     for (const asset of assets) {
       if (asset.category === Category.Cash) continue;
       const entry = prices[asset.symbol];
       if (!entry || entry.change24h === 0) continue;
       const holding = holdingsMap.get(asset.id);
       const quantity = holding?.quantity ?? 0;
-      const currentValue = quantity * entry.price;
-      if (currentValue > 0 && portfolioStats.totalValue > 0) {
+      const valueInBase = convert(
+        quantity * entry.price,
+        asset.currency || "USD",
+        baseCurrency,
+      );
+      if (valueInBase > 0 && portfolioStats.totalValue > 0) {
         weightedChange +=
-          entry.change24h * (currentValue / portfolioStats.totalValue);
+          entry.change24h * (valueInBase / portfolioStats.totalValue);
         hasAnyChange = true;
       }
     }
-
     if (!hasAnyChange)
       return { dailyChangeAmount: null, dailyChangePercent: null };
-
     const dailyChangeAmount =
       portfolioStats.totalValue * (weightedChange / 100);
     return { dailyChangeAmount, dailyChangePercent: weightedChange };
-  }, [assets, prices, holdingsMap, portfolioStats.totalValue]);
+  }, [
+    assets,
+    prices,
+    holdingsMap,
+    portfolioStats.totalValue,
+    convert,
+    baseCurrency,
+  ]);
 
-  // Chart data from snapshots
   const chartData = useMemo(() => {
     if (!snapshots || snapshots.length === 0) return [];
     return snapshots
       .slice()
       .sort((a, b) => Number(a.date) - Number(b.date))
-      .map((s) => ({
-        date: formatDate(s.date),
-        value: s.totalValue,
-      }));
+      .map((s) => ({ date: formatDate(s.date), value: s.totalValue }));
   }, [snapshots]);
 
-  // Sparkline from recent snapshots
   const sparklineData = useMemo(() => {
     if (!snapshots || snapshots.length < 2) return [];
     return snapshots
@@ -255,7 +288,6 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
       .map((s) => s.totalValue);
   }, [snapshots]);
 
-  // Recent transactions (sorted by date desc, top 8)
   const recentTx = useMemo(() => {
     if (!transactions) return [];
     return [...transactions]
@@ -263,35 +295,42 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
       .slice(0, 8);
   }, [transactions]);
 
-  // Record a portfolio snapshot whenever prices update
-  // Throttled to once per 5 minutes; only fires when user has assets + transactions
   const handlePricesUpdated: OnPricesUpdatedFn = useCallback(
     (updatedPrices, updatedAssets) => {
       if (!updatedAssets || updatedAssets.length === 0) return;
       if (!transactions || transactions.length === 0) return;
-
       const elapsed = Date.now() - lastSnapshotTimeRef.current;
       if (elapsed < SNAPSHOT_THROTTLE_MS) return;
 
-      // Calculate current total value with updated prices
-      const hMap = calcHoldingsQuantity(updatedAssets, transactions);
+      const hMap = calcHoldingsQuantity(
+        updatedAssets,
+        transactions,
+        convert,
+        baseCurrency,
+      );
       let total = 0;
       for (const asset of updatedAssets) {
         if (asset.category === Category.Cash) {
-          total += asset.manualPrice;
+          total += convert(
+            asset.manualPrice,
+            asset.currency || "USD",
+            baseCurrency,
+          );
         } else {
           const entry = updatedPrices[asset.symbol];
           const livePrice = entry?.price ?? asset.manualPrice;
           const holding = hMap.get(asset.id);
-          total += (holding?.quantity ?? 0) * livePrice;
+          total += convert(
+            (holding?.quantity ?? 0) * livePrice,
+            asset.currency || "USD",
+            baseCurrency,
+          );
         }
       }
-
       if (total <= 0) return;
 
       lastSnapshotTimeRef.current = Date.now();
-      const ts = BigInt(Date.now()) * 1_000_000n; // nanoseconds for ICP
-
+      const ts = BigInt(Date.now()) * 1_000_000n;
       addSnapshot.mutate({
         id: 0n,
         totalValue: total,
@@ -299,17 +338,26 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
         createdAt: ts,
       });
     },
-    [transactions, addSnapshot],
+    [transactions, addSnapshot, convert, baseCurrency],
   );
 
-  // Subscribe to price updates for snapshot recording
   useEffect(() => {
     const unsubscribe = onPricesUpdated(handlePricesUpdated);
     return unsubscribe;
   }, [onPricesUpdated, handlePricesUpdated]);
 
-  const currency = "USD";
   const isLoading = assetsLoading || txLoading || pricesLoading;
+
+  // Chart Y-axis tick formatter — compact in baseCurrency
+  const yAxisFormatter = useCallback(
+    (v: number) => {
+      if (baseCurrency === "VND") {
+        return `${(v / 1_000_000).toFixed(0)}M₫`;
+      }
+      return `$${(v / 1000).toFixed(0)}k`;
+    },
+    [baseCurrency],
+  );
 
   return (
     <div className="animate-fade-in">
@@ -318,24 +366,28 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <KpiCard
-          title="Total Portfolio Value"
+          title={`Total Portfolio Value (${baseCurrency})`}
           value={
             isLoading
               ? "—"
-              : formatCurrency(portfolioStats.totalValue, currency)
+              : formatCurrency(portfolioStats.totalValue, baseCurrency)
           }
           delta={isLoading ? 0 : portfolioStats.gainLossPercent}
           deltaAmount={
-            isLoading ? "—" : formatCurrency(portfolioStats.gainLoss, currency)
+            isLoading
+              ? "—"
+              : formatCurrency(portfolioStats.gainLoss, baseCurrency)
           }
           positive={portfolioStats.gainLoss >= 0}
           index={0}
           sparkline={sparklineData}
         />
         <KpiCard
-          title="Total Gain / Loss"
+          title={`Total Gain / Loss (${baseCurrency})`}
           value={
-            isLoading ? "—" : formatCurrency(portfolioStats.gainLoss, currency)
+            isLoading
+              ? "—"
+              : formatCurrency(portfolioStats.gainLoss, baseCurrency)
           }
           delta={isLoading ? 0 : portfolioStats.gainLossPercent}
           positive={portfolioStats.gainLoss >= 0}
@@ -347,7 +399,10 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
             isLoading
               ? "—"
               : dailyChangeStats.dailyChangeAmount !== null
-                ? formatCurrency(dailyChangeStats.dailyChangeAmount, currency)
+                ? formatCurrency(
+                    dailyChangeStats.dailyChangeAmount,
+                    baseCurrency,
+                  )
                 : "N/A"
           }
           delta={dailyChangeStats.dailyChangePercent ?? 0}
@@ -433,7 +488,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
                   tick={{ fontSize: 11, fill: "oklch(0.62 0.04 240)" }}
                   axisLine={false}
                   tickLine={false}
-                  tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                  tickFormatter={yAxisFormatter}
                 />
                 <Tooltip
                   contentStyle={{
@@ -444,7 +499,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
                     fontSize: 12,
                   }}
                   formatter={(v: number) => [
-                    formatCurrency(v, currency),
+                    formatCurrency(v, baseCurrency),
                     "Portfolio Value",
                   ]}
                 />
@@ -509,17 +564,22 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
                       fontSize: 12,
                     }}
                     formatter={(v: number) => [
-                      formatCurrency(v, currency),
+                      formatCurrency(v, baseCurrency),
                       "Value",
                     ]}
                   />
                 </PieChart>
               </ResponsiveContainer>
-              {/* Center label */}
               <div className="text-center -mt-2 mb-3">
-                <p className="text-xs text-muted-foreground">Total</p>
+                <p className="text-xs text-muted-foreground">
+                  Total ({baseCurrency})
+                </p>
                 <p className="text-lg font-bold text-foreground">
-                  {formatCurrency(portfolioStats.totalValue, currency, true)}
+                  {formatCurrency(
+                    portfolioStats.totalValue,
+                    baseCurrency,
+                    true,
+                  )}
                 </p>
               </div>
               <div className="space-y-1.5">
@@ -590,43 +650,53 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
                     Price
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right">
-                    Amount
+                    Amount ({baseCurrency})
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentTx.map((tx, i) => (
-                  <TableRow
-                    key={tx.id.toString()}
-                    className="border-border hover:bg-muted/40"
-                    data-ocid={`overview.transactions.item.${i + 1}`}
-                  >
-                    <TableCell className="text-xs text-muted-foreground">
-                      {formatDate(tx.date)}
-                    </TableCell>
-                    <TableCell>
-                      <TxTypeBadge txType={tx.txType} />
-                    </TableCell>
-                    <TableCell className="text-xs font-mono font-medium text-foreground">
-                      {assetMap.get(tx.assetId.toString()) ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-xs text-right text-foreground tabular-nums">
-                      {tx.quantity.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-xs text-right text-muted-foreground tabular-nums">
-                      {formatCurrency(tx.price, currency)}
-                    </TableCell>
-                    <TableCell
-                      className={`text-xs text-right font-medium tabular-nums ${
-                        tx.txType === TxType.Buy || tx.txType === TxType.Deposit
-                          ? "text-fin-green"
-                          : "text-fin-red"
-                      }`}
+                {recentTx.map((tx, i) => {
+                  const asset = assetById.get(tx.assetId);
+                  const txCurrency = tx.currency ?? asset?.currency ?? "USD";
+                  const amountInBase = convert(
+                    tx.quantity * tx.price,
+                    txCurrency,
+                    baseCurrency,
+                  );
+                  return (
+                    <TableRow
+                      key={tx.id.toString()}
+                      className="border-border hover:bg-muted/40"
+                      data-ocid={`overview.transactions.item.${i + 1}`}
                     >
-                      {formatCurrency(tx.quantity * tx.price, currency)}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      <TableCell className="text-xs text-muted-foreground">
+                        {formatDate(tx.date)}
+                      </TableCell>
+                      <TableCell>
+                        <TxTypeBadge txType={tx.txType} />
+                      </TableCell>
+                      <TableCell className="text-xs font-mono font-medium text-foreground">
+                        {assetMap.get(tx.assetId.toString()) ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-xs text-right text-foreground tabular-nums">
+                        {tx.quantity.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-xs text-right text-muted-foreground tabular-nums">
+                        {formatCurrency(tx.price, txCurrency)}
+                      </TableCell>
+                      <TableCell
+                        className={`text-xs text-right font-medium tabular-nums ${
+                          tx.txType === TxType.Buy ||
+                          tx.txType === TxType.Deposit
+                            ? "text-fin-green"
+                            : "text-fin-red"
+                        }`}
+                      >
+                        {formatCurrency(amountInBase, baseCurrency)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

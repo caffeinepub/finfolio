@@ -133,6 +133,7 @@ export interface Transaction {
     date: bigint;
     note: string;
     createdAt: bigint;
+    currency: string;
     quantity: number;
     txType: TxType;
     price: number;
@@ -177,6 +178,18 @@ export interface TransformationInput {
     context: Uint8Array;
     response: http_request_result;
 }
+export interface AddTransactionInput {
+    id: bigint;
+    fee: number;
+    assetId: bigint;
+    date: bigint;
+    note: string;
+    createdAt: bigint;
+    currency: string;
+    quantity: number;
+    txType: TxType;
+    price: number;
+}
 export enum Category {
     Stock = "Stock",
     Cash = "Cash",
@@ -198,7 +211,7 @@ export interface backendInterface {
     _initializeAccessControl(): Promise<void>;
     addAsset(asset: Public__1): Promise<bigint>;
     addSnapshot(snapshot: PortfolioSnapshot): Promise<bigint>;
-    addTransaction(tx: Transaction): Promise<bigint>;
+    addTransaction(tx: AddTransactionInput): Promise<bigint>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     deleteAsset(id: bigint): Promise<void>;
     deleteTransaction(id: bigint): Promise<void>;
@@ -206,8 +219,11 @@ export interface backendInterface {
     getAssets(): Promise<Array<Public__1>>;
     getCallerUserProfile(): Promise<Public | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getExchangeRates(): Promise<Array<[string, number]>>;
     getHoldings(): Promise<Array<Holding>>;
+    getHoldingsInCurrency(targetCurrency: string): Promise<Array<Holding>>;
     getPortfolioSummary(): Promise<PortfolioSummary>;
+    getPortfolioSummaryInCurrency(targetCurrency: string): Promise<PortfolioSummary>;
     getProfile(): Promise<Public | null>;
     getSnapshots(startDate: bigint, endDate: bigint): Promise<Array<PortfolioSnapshot>>;
     getStockPrice(symbol: string): Promise<StockPrice>;
@@ -221,9 +237,9 @@ export interface backendInterface {
     transformSearch(input: TransformationInput): Promise<TransformationOutput>;
     updateAsset(asset: Public__1): Promise<void>;
     updateProfile(profile: Public): Promise<void>;
-    updateTransaction(tx: Transaction): Promise<void>;
+    updateTransaction(tx: AddTransactionInput): Promise<void>;
 }
-import type { Category as _Category, Holding as _Holding, PortfolioSummary as _PortfolioSummary, Public as _Public, Public__1 as _Public__1, Transaction as _Transaction, TxType as _TxType, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
+import type { AddTransactionInput as _AddTransactionInput, Category as _Category, Holding as _Holding, PortfolioSummary as _PortfolioSummary, Public as _Public, Public__1 as _Public__1, Transaction as _Transaction, TxType as _TxType, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async _initializeAccessControl(): Promise<void> {
@@ -268,17 +284,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async addTransaction(arg0: Transaction): Promise<bigint> {
+    async addTransaction(arg0: AddTransactionInput): Promise<bigint> {
         if (this.processError) {
             try {
-                const result = await this.actor.addTransaction(to_candid_Transaction_n5(this._uploadFile, this._downloadFile, arg0));
+                const result = await this.actor.addTransaction(to_candid_AddTransactionInput_n5(this._uploadFile, this._downloadFile, arg0));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.addTransaction(to_candid_Transaction_n5(this._uploadFile, this._downloadFile, arg0));
+            const result = await this.actor.addTransaction(to_candid_AddTransactionInput_n5(this._uploadFile, this._downloadFile, arg0));
             return result;
         }
     }
@@ -380,6 +396,20 @@ export class Backend implements backendInterface {
             return from_candid_UserRole_n18(this._uploadFile, this._downloadFile, result);
         }
     }
+    async getExchangeRates(): Promise<Array<[string, number]>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getExchangeRates();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getExchangeRates();
+            return result;
+        }
+    }
     async getHoldings(): Promise<Array<Holding>> {
         if (this.processError) {
             try {
@@ -394,6 +424,20 @@ export class Backend implements backendInterface {
             return from_candid_vec_n20(this._uploadFile, this._downloadFile, result);
         }
     }
+    async getHoldingsInCurrency(arg0: string): Promise<Array<Holding>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getHoldingsInCurrency(arg0);
+                return from_candid_vec_n20(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getHoldingsInCurrency(arg0);
+            return from_candid_vec_n20(this._uploadFile, this._downloadFile, result);
+        }
+    }
     async getPortfolioSummary(): Promise<PortfolioSummary> {
         if (this.processError) {
             try {
@@ -405,6 +449,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.getPortfolioSummary();
+            return from_candid_PortfolioSummary_n23(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getPortfolioSummaryInCurrency(arg0: string): Promise<PortfolioSummary> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getPortfolioSummaryInCurrency(arg0);
+                return from_candid_PortfolioSummary_n23(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getPortfolioSummaryInCurrency(arg0);
             return from_candid_PortfolioSummary_n23(this._uploadFile, this._downloadFile, result);
         }
     }
@@ -590,17 +648,17 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async updateTransaction(arg0: Transaction): Promise<void> {
+    async updateTransaction(arg0: AddTransactionInput): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateTransaction(to_candid_Transaction_n5(this._uploadFile, this._downloadFile, arg0));
+                const result = await this.actor.updateTransaction(to_candid_AddTransactionInput_n5(this._uploadFile, this._downloadFile, arg0));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateTransaction(to_candid_Transaction_n5(this._uploadFile, this._downloadFile, arg0));
+            const result = await this.actor.updateTransaction(to_candid_AddTransactionInput_n5(this._uploadFile, this._downloadFile, arg0));
             return result;
         }
     }
@@ -761,6 +819,7 @@ function from_candid_record_n29(_uploadFile: (file: ExternalBlob) => Promise<Uin
     date: bigint;
     note: string;
     createdAt: bigint;
+    currency: string;
     quantity: number;
     txType: _TxType;
     price: number;
@@ -771,6 +830,7 @@ function from_candid_record_n29(_uploadFile: (file: ExternalBlob) => Promise<Uin
     date: bigint;
     note: string;
     createdAt: bigint;
+    currency: string;
     quantity: number;
     txType: TxType;
     price: number;
@@ -782,6 +842,7 @@ function from_candid_record_n29(_uploadFile: (file: ExternalBlob) => Promise<Uin
         date: value.date,
         note: value.note,
         createdAt: value.createdAt,
+        currency: value.currency,
         quantity: value.quantity,
         txType: from_candid_TxType_n30(_uploadFile, _downloadFile, value.txType),
         price: value.price
@@ -838,14 +899,14 @@ function from_candid_vec_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
 function from_candid_vec_n32(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Transaction>): Array<Transaction> {
     return value.map((x)=>from_candid_Transaction_n28(_uploadFile, _downloadFile, x));
 }
+function to_candid_AddTransactionInput_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: AddTransactionInput): _AddTransactionInput {
+    return to_candid_record_n6(_uploadFile, _downloadFile, value);
+}
 function to_candid_Category_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Category): _Category {
     return to_candid_variant_n4(_uploadFile, _downloadFile, value);
 }
 function to_candid_Public__1_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Public__1): _Public__1 {
     return to_candid_record_n2(_uploadFile, _downloadFile, value);
-}
-function to_candid_Transaction_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Transaction): _Transaction {
-    return to_candid_record_n6(_uploadFile, _downloadFile, value);
 }
 function to_candid_TxType_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: TxType): _TxType {
     return to_candid_variant_n8(_uploadFile, _downloadFile, value);
@@ -890,6 +951,7 @@ function to_candid_record_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
     date: bigint;
     note: string;
     createdAt: bigint;
+    currency: string;
     quantity: number;
     txType: TxType;
     price: number;
@@ -900,6 +962,7 @@ function to_candid_record_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
     date: bigint;
     note: string;
     createdAt: bigint;
+    currency: string;
     quantity: number;
     txType: _TxType;
     price: number;
@@ -911,6 +974,7 @@ function to_candid_record_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
         date: value.date,
         note: value.note,
         createdAt: value.createdAt,
+        currency: value.currency,
         quantity: value.quantity,
         txType: to_candid_TxType_n7(_uploadFile, _downloadFile, value.txType),
         price: value.price

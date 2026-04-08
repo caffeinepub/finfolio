@@ -1,6 +1,7 @@
 import type { backendInterface } from "@/backend";
 import { Category, type Public__1 } from "@/backend.d";
 import { useGetAssets } from "@/hooks/useQueries";
+import { convertCurrency } from "@/utils/formatters";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   createContext,
@@ -12,7 +13,6 @@ import {
 } from "react";
 
 // Fallback map for assets saved with old uppercase format (e.g. BTC -> bitcoin)
-// New assets store the CoinGecko ID directly (e.g. 'bitcoin')
 const COINGECKO_ID_MAP: Record<string, string> = {
   BTC: "bitcoin",
   ETH: "ethereum",
@@ -38,9 +38,6 @@ const COINGECKO_ID_MAP: Record<string, string> = {
   TRX: "tron",
 };
 
-/**
- * Resolve a crypto symbol to a CoinGecko coin ID.
- */
 function getCoinGeckoId(symbol: string): string {
   return COINGECKO_ID_MAP[symbol.toUpperCase()] ?? symbol.toLowerCase();
 }
@@ -61,10 +58,22 @@ export type PriceMap = Record<string, PriceEntry>;
 /** Callback type for when price fetch completes. Receives fresh prices and assets. */
 export type OnPricesUpdatedFn = (prices: PriceMap, assets: Public__1[]) => void;
 
+/**
+ * Exchange rates vs USD — used for currency conversion throughout the app.
+ * Key: currency code (e.g. "USD", "VND", "EUR"). Value: USD per 1 unit of that currency.
+ * For VND: rates["VND"] = 0.000040 (approx)
+ * For EUR: rates["EUR"] = 1.08 (approx)
+ */
+export type ExchangeRates = Record<string, number>;
+
 export interface PriceFeedContextValue {
   prices: PriceMap;
   isLoading: boolean;
   refetch: () => void;
+  /** Exchange rates vs USD (from Frankfurter). Key = currency code, value = USD equivalent of 1 unit */
+  exchangeRates: ExchangeRates;
+  /** Convert amount from one currency to another using live exchange rates */
+  convert: (amount: number, from: string, to: string) => number;
   /** Register a callback to be called every time prices are successfully updated. Returns an unsubscribe function. */
   onPricesUpdated: (cb: OnPricesUpdatedFn) => () => void;
 }
@@ -73,15 +82,26 @@ export const PriceFeedContext = createContext<PriceFeedContextValue>({
   prices: {},
   isLoading: false,
   refetch: () => {},
+  exchangeRates: { USD: 1 },
+  convert: (amount) => amount,
   onPricesUpdated: () => () => {},
 });
 
 const POLL_INTERVAL_MS = 30_000;
+// Major currencies to prefetch for conversion
+const PREFETCH_CURRENCIES = [
+  "EUR",
+  "GBP",
+  "JPY",
+  "VND",
+  "AUD",
+  "CAD",
+  "CHF",
+  "SGD",
+  "HKD",
+  "KRW",
+];
 
-/**
- * Get the best available actor from queryClient cache.
- * Prefers authenticated actors (non-anonymous principal) over anonymous ones.
- */
 function getActorFromCache(
   qc: ReturnType<typeof useQueryClient>,
 ): backendInterface | null {
@@ -91,14 +111,13 @@ function getActorFromCache(
     if (!data) continue;
     const principal = queryKey[1] as string | undefined;
     if (principal && principal !== "undefined" && principal !== "2vxsx-fae") {
-      return data; // authenticated actor -- use immediately
+      return data;
     }
     bestActor = data;
   }
   return bestActor;
 }
 
-// Batch crypto fetch (single API call for all crypto assets)
 async function fetchCryptoPrices(
   symbols: string[],
 ): Promise<Record<string, { price: number; change24h: number }>> {
@@ -136,9 +155,7 @@ async function fetchForexPrice(
   try {
     const res = await fetch(
       `https://api.frankfurter.app/latest?from=${base}&to=USD`,
-      {
-        signal: AbortSignal.timeout(8000),
-      },
+      { signal: AbortSignal.timeout(8000) },
     );
     if (!res.ok) return null;
     const json = await res.json();
@@ -150,15 +167,78 @@ async function fetchForexPrice(
   }
 }
 
+/**
+ * Fetch exchange rates for a batch of currencies vs USD using Frankfurter.
+ * Returns a map: currency -> USD per 1 unit of that currency.
+ */
+async function fetchExchangeRates(
+  currencies: string[],
+): Promise<ExchangeRates> {
+  const rates: ExchangeRates = { USD: 1 };
+  if (currencies.length === 0) return rates;
+
+  // Filter out non-fiat currencies (BTC, ETH handled separately via price feed)
+  const fiatCurrencies = currencies.filter(
+    (c) => !["BTC", "ETH", "USD"].includes(c.toUpperCase()),
+  );
+  if (fiatCurrencies.length === 0) return rates;
+
+  try {
+    // Frankfurter: from=USD gives how many units of each currency per 1 USD
+    // We want the inverse: USD per 1 unit of each currency
+    const targets = fiatCurrencies.join(",");
+    const res = await fetch(
+      `https://api.frankfurter.app/latest?from=USD&to=${targets}`,
+      { signal: AbortSignal.timeout(8000) },
+    );
+    if (!res.ok) return rates;
+    const json = await res.json();
+    if (json?.rates) {
+      for (const [cur, val] of Object.entries(json.rates)) {
+        if (typeof val === "number" && val > 0) {
+          // json.rates[VND] = ~25000 means 1 USD = 25000 VND
+          // So 1 VND = 1/25000 USD
+          rates[cur.toUpperCase()] = 1 / val;
+        }
+      }
+    }
+  } catch {
+    // Return partial rates
+  }
+  return rates;
+}
+
 export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
   const [prices, setPrices] = useState<PriceMap>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [exchangeRates, setExchangeRates] = useState<ExchangeRates>({ USD: 1 });
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isFetchingRef = useRef(false);
   const firstFetchDone = useRef(false);
   const listenersRef = useRef<Set<OnPricesUpdatedFn>>(new Set());
   const { data: assets } = useGetAssets();
   const queryClient = useQueryClient();
+
+  // Build the convert function using current exchangeRates and crypto prices
+  const convert = useCallback(
+    (amount: number, from: string, to: string): number => {
+      const from_ = from.toUpperCase();
+      const to_ = to.toUpperCase();
+      if (from_ === to_) return amount;
+
+      // Build a combined rates map including crypto prices (crypto → USD)
+      const combinedRates: ExchangeRates = { ...exchangeRates };
+      // Add crypto rates from prices (price is already in USD)
+      for (const [symbol, entry] of Object.entries(prices)) {
+        if (["BTC", "ETH"].includes(symbol.toUpperCase()) && entry.price > 0) {
+          combinedRates[symbol.toUpperCase()] = entry.price; // 1 BTC = price USD
+        }
+      }
+
+      return convertCurrency(amount, from_, to_, combinedRates);
+    },
+    [exchangeRates, prices],
+  );
 
   const fetchAllPrices = useCallback(async () => {
     if (!assets || assets.length === 0) {
@@ -174,42 +254,52 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
     const forexAssets = assets.filter((a) => a.category === Category.Forex);
     const stockAssets = assets.filter((a) => a.category === Category.Stock);
 
+    // Collect all asset currencies for exchange rate prefetch
+    const assetCurrencies = [
+      ...new Set(assets.map((a) => a.currency.toUpperCase())),
+    ];
+    const allCurrenciesToFetch = [
+      ...new Set([...PREFETCH_CURRENCIES, ...assetCurrencies]),
+    ].filter((c) => !["BTC", "ETH", "USD"].includes(c));
+
     const cryptoSymbols = cryptoAssets.map((a) => a.symbol);
 
-    // Run all fetches in parallel
-    const [cryptoBatchResult, forexResults, stockResults] = await Promise.all([
-      fetchCryptoPrices(cryptoSymbols),
-      Promise.all(
-        forexAssets.map(async (asset) => {
-          const result = await fetchForexPrice(asset.symbol);
-          return { asset, result };
-        }),
-      ),
-      // All stocks: use backend actor (proxies Yahoo Finance via http-outcalls, no CORS)
-      Promise.all(
-        stockAssets.map(async (asset) => {
-          if (actor?.getStockPrice) {
-            try {
-              const res = await actor.getStockPrice(asset.symbol);
-              if (res.ok && res.price > 0) {
-                return {
-                  asset,
-                  result: { price: res.price, change24h: res.change24h },
-                };
+    const [cryptoBatchResult, forexResults, stockResults, freshRates] =
+      await Promise.all([
+        fetchCryptoPrices(cryptoSymbols),
+        Promise.all(
+          forexAssets.map(async (asset) => {
+            const result = await fetchForexPrice(asset.symbol);
+            return { asset, result };
+          }),
+        ),
+        Promise.all(
+          stockAssets.map(async (asset) => {
+            if (actor?.getStockPrice) {
+              try {
+                const res = await actor.getStockPrice(asset.symbol);
+                if (res.ok && res.price > 0) {
+                  return {
+                    asset,
+                    result: { price: res.price, change24h: res.change24h },
+                  };
+                }
+              } catch {
+                // fall through
               }
-            } catch {
-              // actor call failed, fall through to error state
             }
-          }
-          return { asset, result: null };
-        }),
-      ),
-    ]);
+            return { asset, result: null };
+          }),
+        ),
+        fetchExchangeRates(allCurrenciesToFetch),
+      ]);
+
+    // Update exchange rates
+    setExchangeRates(freshRates);
 
     const now = Date.now();
     const newPrices: PriceMap = {};
 
-    // Process crypto results from batch
     for (const asset of cryptoAssets) {
       const result = cryptoBatchResult[asset.symbol];
       if (result) {
@@ -231,7 +321,6 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Process forex results
     for (const { asset, result } of forexResults) {
       const key = asset.symbol;
       if (result) {
@@ -253,7 +342,6 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Process stock results (Yahoo Finance via backend)
     for (const { asset, result } of stockResults) {
       const key = asset.symbol;
       if (result) {
@@ -275,7 +363,6 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Cash assets: use manualPrice directly
     for (const asset of assets.filter((a) => a.category === Category.Cash)) {
       newPrices[asset.symbol] = {
         price: asset.manualPrice,
@@ -288,7 +375,6 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
 
     setPrices((prev) => {
       const merged = { ...prev, ...newPrices };
-      // Notify all listeners with the fresh merged prices
       for (const listener of listenersRef.current) {
         try {
           listener(merged, assets);
@@ -307,16 +393,13 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
     isFetchingRef.current = false;
   }, [assets, queryClient]);
 
-  // Run on mount and set up polling
   useEffect(() => {
     if (!assets || assets.length === 0) {
       setIsLoading(false);
       return;
     }
-
     fetchAllPrices();
     intervalRef.current = setInterval(fetchAllPrices, POLL_INTERVAL_MS);
-
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
@@ -336,7 +419,14 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <PriceFeedContext.Provider
-      value={{ prices, isLoading, refetch, onPricesUpdated }}
+      value={{
+        prices,
+        isLoading,
+        refetch,
+        exchangeRates,
+        convert,
+        onPricesUpdated,
+      }}
     >
       {children}
     </PriceFeedContext.Provider>

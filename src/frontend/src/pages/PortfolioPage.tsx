@@ -9,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { usePrices } from "@/contexts/PriceFeedContext";
-import { useGetHoldings } from "@/hooks/useQueries";
+import { useGetHoldings, useGetProfile } from "@/hooks/useQueries";
 import {
   formatCurrency,
   formatNumber,
@@ -21,9 +21,12 @@ import { useMemo } from "react";
 
 export default function PortfolioPage() {
   const { data: holdings, isLoading } = useGetHoldings();
-  const { prices } = usePrices();
+  const { prices, convert } = usePrices();
+  const { data: profile } = useGetProfile();
 
-  // Override backend holdings with live prices from PriceFeedContext
+  const baseCurrency = profile?.baseCurrency ?? "USD";
+
+  // Enrich holdings with live prices and convert values to baseCurrency
   const enrichedHoldings = useMemo(() => {
     if (!holdings) return [];
     return holdings
@@ -33,25 +36,58 @@ export default function PortfolioPage() {
           liveEntry?.price !== undefined && liveEntry.price > 0
             ? liveEntry.price
             : h.currentPrice;
-        const totalValue = h.quantity * livePrice;
-        const gainLoss = totalValue - h.totalCost;
+        const totalValueInAssetCurrency = h.quantity * livePrice;
+        // Convert to baseCurrency for portfolio total
+        const totalValueInBase = convert(
+          totalValueInAssetCurrency,
+          h.currency || "USD",
+          baseCurrency,
+        );
+        const totalCostInBase = convert(
+          h.totalCost,
+          h.currency || "USD",
+          baseCurrency,
+        );
+        const gainLossInBase = totalValueInBase - totalCostInBase;
         const gainLossPercent =
-          h.totalCost > 0 ? (gainLoss / h.totalCost) * 100 : 0;
+          totalCostInBase > 0 ? (gainLossInBase / totalCostInBase) * 100 : 0;
         return {
           ...h,
           currentPrice: livePrice,
-          totalValue,
-          gainLoss,
-          gainLossPercent,
+          // original currency values for display
+          totalValue: totalValueInAssetCurrency,
+          gainLoss: totalValueInAssetCurrency - h.totalCost,
+          gainLossPercent:
+            h.totalCost > 0
+              ? ((totalValueInAssetCurrency - h.totalCost) / h.totalCost) * 100
+              : 0,
+          // baseCurrency converted values for total and sorting
+          totalValueInBase,
+          totalCostInBase,
+          gainLossInBase,
+          gainLossPercentBase: gainLossPercent,
         };
       })
-      .sort((a, b) => b.totalValue - a.totalValue);
-  }, [holdings, prices]);
+      .sort((a, b) => b.totalValueInBase - a.totalValueInBase);
+  }, [holdings, prices, convert, baseCurrency]);
 
   const totalPortfolioValue = useMemo(
-    () => enrichedHoldings.reduce((sum, h) => sum + h.totalValue, 0),
+    () => enrichedHoldings.reduce((sum, h) => sum + h.totalValueInBase, 0),
     [enrichedHoldings],
   );
+
+  const totalGainLoss = useMemo(
+    () => enrichedHoldings.reduce((sum, h) => sum + h.gainLossInBase, 0),
+    [enrichedHoldings],
+  );
+
+  const totalCost = useMemo(
+    () => enrichedHoldings.reduce((sum, h) => sum + h.totalCostInBase, 0),
+    [enrichedHoldings],
+  );
+
+  const totalGainLossPercent =
+    totalCost > 0 ? (totalGainLoss / totalCost) * 100 : 0;
 
   return (
     <motion.div
@@ -69,10 +105,17 @@ export default function PortfolioPage() {
         </div>
         <div className="flex flex-col items-end gap-0.5">
           <span className="text-sm font-semibold text-foreground">
-            {formatCurrency(totalPortfolioValue, "USD")}
+            {formatCurrency(totalPortfolioValue, baseCurrency)}
+          </span>
+          <span
+            className={`text-xs font-medium ${totalGainLoss >= 0 ? "text-fin-green" : "text-fin-red"}`}
+          >
+            {totalGainLoss >= 0 ? "+" : ""}
+            {formatCurrency(totalGainLoss, baseCurrency)} (
+            {formatPercent(totalGainLossPercent)})
           </span>
           <span className="text-xs text-muted-foreground">
-            {enrichedHoldings.length} holdings · live prices
+            {enrichedHoldings.length} holdings · live prices · {baseCurrency}
           </span>
         </div>
       </div>
@@ -111,18 +154,21 @@ export default function PortfolioPage() {
                     Live Price
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right">
-                    Total Value
+                    Value ({baseCurrency})
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right pr-5">
-                    Gain/Loss
+                    Gain/Loss ({baseCurrency})
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {enrichedHoldings.map((h, i) => {
-                  const isPositive = h.gainLoss >= 0;
+                  const isPositive = h.gainLossInBase >= 0;
                   const liveEntry = prices[h.symbol];
                   const isLive = liveEntry?.status === "live";
+                  const assetCurrency = h.currency || "USD";
+                  const showConverted =
+                    assetCurrency.toUpperCase() !== baseCurrency.toUpperCase();
                   return (
                     <TableRow
                       key={h.assetId.toString()}
@@ -146,12 +192,12 @@ export default function PortfolioPage() {
                         {formatNumber(h.quantity, 4)}
                       </TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground tabular-nums">
-                        {formatCurrency(h.averageCost, h.currency)}
+                        {formatCurrency(h.averageCost, assetCurrency)}
                       </TableCell>
                       <TableCell className="text-right text-sm text-foreground tabular-nums">
                         <div className="flex flex-col items-end">
                           <span>
-                            {formatCurrency(h.currentPrice, h.currency)}
+                            {formatCurrency(h.currentPrice, assetCurrency)}
                           </span>
                           {isLive && (
                             <span className="text-[10px] text-fin-green opacity-70">
@@ -161,13 +207,20 @@ export default function PortfolioPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right text-sm font-semibold text-foreground tabular-nums">
-                        {formatCurrency(h.totalValue, h.currency)}
+                        <div className="flex flex-col items-end">
+                          <span>
+                            {formatCurrency(h.totalValueInBase, baseCurrency)}
+                          </span>
+                          {showConverted && (
+                            <span className="text-[10px] text-muted-foreground">
+                              {formatCurrency(h.totalValue, assetCurrency)}
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right pr-5">
                         <div
-                          className={`flex flex-col items-end ${
-                            isPositive ? "text-fin-green" : "text-fin-red"
-                          }`}
+                          className={`flex flex-col items-end ${isPositive ? "text-fin-green" : "text-fin-red"}`}
                         >
                           <span className="text-sm font-medium flex items-center gap-1">
                             {isPositive ? (
@@ -175,7 +228,7 @@ export default function PortfolioPage() {
                             ) : (
                               <TrendingDown className="w-3 h-3" />
                             )}
-                            {formatCurrency(h.gainLoss, h.currency)}
+                            {formatCurrency(h.gainLossInBase, baseCurrency)}
                           </span>
                           <span className="text-xs opacity-80">
                             {formatPercent(h.gainLossPercent)}

@@ -36,13 +36,14 @@ export const TxType = IDL.Variant({
   'Deposit' : IDL.Null,
   'Sell' : IDL.Null,
 });
-export const Transaction = IDL.Record({
+export const AddTransactionInput = IDL.Record({
   'id' : IDL.Nat,
   'fee' : IDL.Float64,
   'assetId' : IDL.Nat,
   'date' : IDL.Int,
   'note' : IDL.Text,
   'createdAt' : IDL.Int,
+  'currency' : IDL.Text,
   'quantity' : IDL.Float64,
   'txType' : TxType,
   'price' : IDL.Float64,
@@ -92,6 +93,18 @@ export const StockPrice = IDL.Record({
   'price' : IDL.Float64,
   'symbol' : IDL.Text,
 });
+export const Transaction = IDL.Record({
+  'id' : IDL.Nat,
+  'fee' : IDL.Float64,
+  'assetId' : IDL.Nat,
+  'date' : IDL.Int,
+  'note' : IDL.Text,
+  'createdAt' : IDL.Int,
+  'currency' : IDL.Text,
+  'quantity' : IDL.Float64,
+  'txType' : TxType,
+  'price' : IDL.Float64,
+});
 export const StockSearchResult = IDL.Record({
   'name' : IDL.Text,
   'exchange' : IDL.Text,
@@ -120,7 +133,7 @@ export const idlService = IDL.Service({
   '_initializeAccessControl' : IDL.Func([], [], []),
   'addAsset' : IDL.Func([Public__1], [IDL.Nat], []),
   'addSnapshot' : IDL.Func([PortfolioSnapshot], [IDL.Nat], []),
-  'addTransaction' : IDL.Func([Transaction], [IDL.Nat], []),
+  'addTransaction' : IDL.Func([AddTransactionInput], [IDL.Nat], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'deleteAsset' : IDL.Func([IDL.Nat], [], []),
   'deleteTransaction' : IDL.Func([IDL.Nat], [], []),
@@ -128,8 +141,19 @@ export const idlService = IDL.Service({
   'getAssets' : IDL.Func([], [IDL.Vec(Public__1)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(Public)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getExchangeRates' : IDL.Func(
+      [],
+      [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64))],
+      [],
+    ),
   'getHoldings' : IDL.Func([], [IDL.Vec(Holding)], ['query']),
+  'getHoldingsInCurrency' : IDL.Func([IDL.Text], [IDL.Vec(Holding)], ['query']),
   'getPortfolioSummary' : IDL.Func([], [PortfolioSummary], ['query']),
+  'getPortfolioSummaryInCurrency' : IDL.Func(
+      [IDL.Text],
+      [PortfolioSummary],
+      ['query'],
+    ),
   'getProfile' : IDL.Func([], [IDL.Opt(Public)], ['query']),
   'getSnapshots' : IDL.Func(
       [IDL.Int, IDL.Int],
@@ -155,7 +179,7 @@ export const idlService = IDL.Service({
     ),
   'updateAsset' : IDL.Func([Public__1], [], []),
   'updateProfile' : IDL.Func([Public], [], []),
-  'updateTransaction' : IDL.Func([Transaction], [], []),
+  'updateTransaction' : IDL.Func([AddTransactionInput], [], []),
 });
 
 export const idlInitArgs = [];
@@ -189,13 +213,14 @@ export const idlFactory = ({ IDL }) => {
     'Deposit' : IDL.Null,
     'Sell' : IDL.Null,
   });
-  const Transaction = IDL.Record({
+  const AddTransactionInput = IDL.Record({
     'id' : IDL.Nat,
     'fee' : IDL.Float64,
     'assetId' : IDL.Nat,
     'date' : IDL.Int,
     'note' : IDL.Text,
     'createdAt' : IDL.Int,
+    'currency' : IDL.Text,
     'quantity' : IDL.Float64,
     'txType' : TxType,
     'price' : IDL.Float64,
@@ -245,6 +270,18 @@ export const idlFactory = ({ IDL }) => {
     'price' : IDL.Float64,
     'symbol' : IDL.Text,
   });
+  const Transaction = IDL.Record({
+    'id' : IDL.Nat,
+    'fee' : IDL.Float64,
+    'assetId' : IDL.Nat,
+    'date' : IDL.Int,
+    'note' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'currency' : IDL.Text,
+    'quantity' : IDL.Float64,
+    'txType' : TxType,
+    'price' : IDL.Float64,
+  });
   const StockSearchResult = IDL.Record({
     'name' : IDL.Text,
     'exchange' : IDL.Text,
@@ -270,7 +307,7 @@ export const idlFactory = ({ IDL }) => {
     '_initializeAccessControl' : IDL.Func([], [], []),
     'addAsset' : IDL.Func([Public__1], [IDL.Nat], []),
     'addSnapshot' : IDL.Func([PortfolioSnapshot], [IDL.Nat], []),
-    'addTransaction' : IDL.Func([Transaction], [IDL.Nat], []),
+    'addTransaction' : IDL.Func([AddTransactionInput], [IDL.Nat], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'deleteAsset' : IDL.Func([IDL.Nat], [], []),
     'deleteTransaction' : IDL.Func([IDL.Nat], [], []),
@@ -278,8 +315,23 @@ export const idlFactory = ({ IDL }) => {
     'getAssets' : IDL.Func([], [IDL.Vec(Public__1)], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(Public)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getExchangeRates' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64))],
+        [],
+      ),
     'getHoldings' : IDL.Func([], [IDL.Vec(Holding)], ['query']),
+    'getHoldingsInCurrency' : IDL.Func(
+        [IDL.Text],
+        [IDL.Vec(Holding)],
+        ['query'],
+      ),
     'getPortfolioSummary' : IDL.Func([], [PortfolioSummary], ['query']),
+    'getPortfolioSummaryInCurrency' : IDL.Func(
+        [IDL.Text],
+        [PortfolioSummary],
+        ['query'],
+      ),
     'getProfile' : IDL.Func([], [IDL.Opt(Public)], ['query']),
     'getSnapshots' : IDL.Func(
         [IDL.Int, IDL.Int],
@@ -305,7 +357,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'updateAsset' : IDL.Func([Public__1], [], []),
     'updateProfile' : IDL.Func([Public], [], []),
-    'updateTransaction' : IDL.Func([Transaction], [], []),
+    'updateTransaction' : IDL.Func([AddTransactionInput], [], []),
   });
 };
 

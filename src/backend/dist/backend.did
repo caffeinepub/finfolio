@@ -37,6 +37,7 @@ type Transaction =
  record {
    assetId: nat;
    createdAt: int;
+   currency: text;
    date: int;
    fee: float64;
    id: nat;
@@ -119,11 +120,24 @@ type Category =
    Forex;
    Stock;
  };
+type AddTransactionInput = 
+ record {
+   assetId: nat;
+   createdAt: int;
+   currency: text;
+   date: int;
+   fee: float64;
+   id: nat;
+   note: text;
+   price: float64;
+   quantity: float64;
+   txType: TxType;
+ };
 service : {
   _initializeAccessControl: () -> ();
   addAsset: (asset: Public__1) -> (nat);
   addSnapshot: (snapshot: PortfolioSnapshot) -> (nat);
-  addTransaction: (tx: Transaction) -> (nat);
+  addTransaction: (tx: AddTransactionInput) -> (nat);
   assignCallerUserRole: (user: principal, role: UserRole) -> ();
   deleteAsset: (id: nat) -> ();
   deleteTransaction: (id: nat) -> ();
@@ -131,8 +145,15 @@ service : {
   getAssets: () -> (vec Public__1) query;
   getCallerUserProfile: () -> (opt Public) query;
   getCallerUserRole: () -> (UserRole) query;
+  getExchangeRates: () -> (vec record {
+                                 text;
+                                 float64;
+                               });
   getHoldings: () -> (vec Holding) query;
+  getHoldingsInCurrency: (targetCurrency: text) -> (vec Holding) query;
   getPortfolioSummary: () -> (PortfolioSummary) query;
+  getPortfolioSummaryInCurrency: (targetCurrency: text) ->
+   (PortfolioSummary) query;
   getProfile: () -> (opt Public) query;
   getSnapshots: (startDate: int, endDate: int) ->
    (vec PortfolioSnapshot) query;
@@ -148,5 +169,5 @@ service : {
    (TransformationOutput) query;
   updateAsset: (asset: Public__1) -> ();
   updateProfile: (profile: Public) -> ();
-  updateTransaction: (tx: Transaction) -> ();
+  updateTransaction: (tx: AddTransactionInput) -> ();
 }

@@ -51,6 +51,7 @@ export interface Transaction {
     date: bigint;
     note: string;
     createdAt: bigint;
+    currency: string;
     quantity: number;
     txType: TxType;
     price: number;
@@ -95,6 +96,18 @@ export interface TransformationInput {
     context: Uint8Array;
     response: http_request_result;
 }
+export interface AddTransactionInput {
+    id: bigint;
+    fee: number;
+    assetId: bigint;
+    date: bigint;
+    note: string;
+    createdAt: bigint;
+    currency: string;
+    quantity: number;
+    txType: TxType;
+    price: number;
+}
 export enum Category {
     Stock = "Stock",
     Cash = "Cash",
@@ -115,7 +128,7 @@ export enum UserRole {
 export interface backendInterface {
     addAsset(asset: Public__1): Promise<bigint>;
     addSnapshot(snapshot: PortfolioSnapshot): Promise<bigint>;
-    addTransaction(tx: Transaction): Promise<bigint>;
+    addTransaction(tx: AddTransactionInput): Promise<bigint>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     deleteAsset(id: bigint): Promise<void>;
     deleteTransaction(id: bigint): Promise<void>;
@@ -123,8 +136,11 @@ export interface backendInterface {
     getAssets(): Promise<Array<Public__1>>;
     getCallerUserProfile(): Promise<Public | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getExchangeRates(): Promise<Array<[string, number]>>;
     getHoldings(): Promise<Array<Holding>>;
+    getHoldingsInCurrency(targetCurrency: string): Promise<Array<Holding>>;
     getPortfolioSummary(): Promise<PortfolioSummary>;
+    getPortfolioSummaryInCurrency(targetCurrency: string): Promise<PortfolioSummary>;
     getProfile(): Promise<Public | null>;
     getSnapshots(startDate: bigint, endDate: bigint): Promise<Array<PortfolioSnapshot>>;
     getStockPrice(symbol: string): Promise<StockPrice>;
@@ -138,5 +154,5 @@ export interface backendInterface {
     transformSearch(input: TransformationInput): Promise<TransformationOutput>;
     updateAsset(asset: Public__1): Promise<void>;
     updateProfile(profile: Public): Promise<void>;
-    updateTransaction(tx: Transaction): Promise<void>;
+    updateTransaction(tx: AddTransactionInput): Promise<void>;
 }

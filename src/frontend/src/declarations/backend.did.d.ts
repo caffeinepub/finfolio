@@ -10,6 +10,18 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface AddTransactionInput {
+  'id' : bigint,
+  'fee' : number,
+  'assetId' : bigint,
+  'date' : bigint,
+  'note' : string,
+  'createdAt' : bigint,
+  'currency' : string,
+  'quantity' : number,
+  'txType' : TxType,
+  'price' : number,
+}
 export type Category = { 'Stock' : null } |
   { 'Cash' : null } |
   { 'Forex' : null } |
@@ -78,6 +90,7 @@ export interface Transaction {
   'date' : bigint,
   'note' : string,
   'createdAt' : bigint,
+  'currency' : string,
   'quantity' : number,
   'txType' : TxType,
   'price' : number,
@@ -108,7 +121,7 @@ export interface _SERVICE {
   '_initializeAccessControl' : ActorMethod<[], undefined>,
   'addAsset' : ActorMethod<[Public__1], bigint>,
   'addSnapshot' : ActorMethod<[PortfolioSnapshot], bigint>,
-  'addTransaction' : ActorMethod<[Transaction], bigint>,
+  'addTransaction' : ActorMethod<[AddTransactionInput], bigint>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'deleteAsset' : ActorMethod<[bigint], undefined>,
   'deleteTransaction' : ActorMethod<[bigint], undefined>,
@@ -116,8 +129,11 @@ export interface _SERVICE {
   'getAssets' : ActorMethod<[], Array<Public__1>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [Public]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getExchangeRates' : ActorMethod<[], Array<[string, number]>>,
   'getHoldings' : ActorMethod<[], Array<Holding>>,
+  'getHoldingsInCurrency' : ActorMethod<[string], Array<Holding>>,
   'getPortfolioSummary' : ActorMethod<[], PortfolioSummary>,
+  'getPortfolioSummaryInCurrency' : ActorMethod<[string], PortfolioSummary>,
   'getProfile' : ActorMethod<[], [] | [Public]>,
   'getSnapshots' : ActorMethod<[bigint, bigint], Array<PortfolioSnapshot>>,
   'getStockPrice' : ActorMethod<[string], StockPrice>,
@@ -131,7 +147,7 @@ export interface _SERVICE {
   'transformSearch' : ActorMethod<[TransformationInput], TransformationOutput>,
   'updateAsset' : ActorMethod<[Public__1], undefined>,
   'updateProfile' : ActorMethod<[Public], undefined>,
-  'updateTransaction' : ActorMethod<[Transaction], undefined>,
+  'updateTransaction' : ActorMethod<[AddTransactionInput], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

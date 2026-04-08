@@ -1,4 +1,4 @@
-import type { Transaction } from "@/backend.d";
+import type { Public__1 } from "@/backend.d";
 import { TxType } from "@/backend.d";
 import { TxTypeBadge } from "@/components/Badges";
 import { EmptyState, PageLoader } from "@/components/LoadingStates";
@@ -30,6 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { TransactionWithCurrency } from "@/hooks/useQueries";
 import {
   useAddTransaction,
   useDeleteTransaction,
@@ -38,7 +39,9 @@ import {
   useUpdateTransaction,
 } from "@/hooks/useQueries";
 import {
+  CURRENCY_OPTIONS,
   dateInputToTimestamp,
+  formatCurrency,
   formatDate,
   formatDateInput,
 } from "@/utils/formatters";
@@ -56,6 +59,7 @@ type TxFormState = {
   price: string;
   fee: string;
   note: string;
+  currency: string;
 };
 
 const defaultForm: TxFormState = {
@@ -65,7 +69,35 @@ const defaultForm: TxFormState = {
   price: "",
   fee: "0",
   note: "",
+  currency: "USD",
 };
+
+/** Dropdown showing currency code + flag/symbol */
+function CurrencySelect({
+  value,
+  onChange,
+  id,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  id?: string;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      id={id}
+      className="mt-1 w-full h-10 px-3 rounded-md bg-muted border border-border text-foreground text-sm focus:outline-none focus:border-fin-green/50"
+      data-ocid="transactions.currency.select"
+    >
+      {CURRENCY_OPTIONS.map((opt) => (
+        <option key={opt.code} value={opt.code}>
+          {opt.flag} {opt.label}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 export default function TransactionsPage() {
   const { data: transactions, isLoading: txLoading } = useGetTransactions();
@@ -75,7 +107,8 @@ export default function TransactionsPage() {
   const updateTransaction = useUpdateTransaction();
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
+  const [deleteTarget, setDeleteTarget] =
+    useState<TransactionWithCurrency | null>(null);
   const [filterType, setFilterType] = useState<string>("All");
   const [filterAsset, setFilterAsset] = useState<string>("all");
 
@@ -84,10 +117,18 @@ export default function TransactionsPage() {
     ...defaultForm,
   });
 
-  // Edit state
   const [editingTransaction, setEditingTransaction] =
-    useState<Transaction | null>(null);
+    useState<TransactionWithCurrency | null>(null);
   const [editForm, setEditForm] = useState<TxFormState>(defaultForm);
+
+  // Map assetId -> asset object for quick lookup
+  const assetById = useMemo(() => {
+    const m = new Map<string, Public__1>();
+    if (assets) {
+      for (const a of assets) m.set(a.id.toString(), a);
+    }
+    return m;
+  }, [assets]);
 
   const assetMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -109,20 +150,33 @@ export default function TransactionsPage() {
       });
   }, [transactions, filterType, filterAsset]);
 
+  /** When an asset is selected in the add form, auto-set currency from that asset */
+  const handleAddAssetChange = (assetIdStr: string) => {
+    const asset = assetById.get(assetIdStr);
+    setAddForm((p) => ({
+      ...p,
+      assetId: assetIdStr,
+      currency: asset?.currency ?? p.currency,
+    }));
+  };
+
   const openAdd = () => {
+    const firstAsset = assets && assets.length > 0 ? assets[0] : null;
     setAddForm({
-      assetId: assets && assets.length > 0 ? assets[0].id.toString() : "",
+      assetId: firstAsset ? firstAsset.id.toString() : "",
       txType: TxType.Buy,
       date: TODAY,
       quantity: "",
       price: "",
       fee: "0",
       note: "",
+      currency: firstAsset?.currency ?? "USD",
     });
     setDialogOpen(true);
   };
 
-  const openEdit = (tx: Transaction) => {
+  const openEdit = (tx: TransactionWithCurrency) => {
+    const asset = assetById.get(tx.assetId.toString());
     setEditForm({
       txType: tx.txType,
       date: formatDateInput(Number(tx.date) / 1_000_000),
@@ -130,6 +184,7 @@ export default function TransactionsPage() {
       price: tx.price.toString(),
       fee: tx.fee.toString(),
       note: tx.note,
+      currency: tx.currency ?? asset?.currency ?? "USD",
     });
     setEditingTransaction(tx);
   };
@@ -156,6 +211,7 @@ export default function TransactionsPage() {
         price: Number.parseFloat(addForm.price) || 0,
         fee: Number.parseFloat(addForm.fee) || 0,
         note: addForm.note,
+        currency: addForm.currency,
       });
       toast.success("Transaction added");
       setDialogOpen(false);
@@ -178,6 +234,7 @@ export default function TransactionsPage() {
         price: Number.parseFloat(editForm.price) || 0,
         fee: Number.parseFloat(editForm.fee) || 0,
         note: editForm.note,
+        currency: editForm.currency,
       });
       toast.success("Transaction updated");
       closeEdit();
@@ -195,6 +252,12 @@ export default function TransactionsPage() {
     } catch {
       toast.error("Failed to delete transaction");
     }
+  };
+
+  /** Resolve the display currency for a transaction: tx.currency → asset.currency → "USD" */
+  const getTxCurrency = (tx: TransactionWithCurrency): string => {
+    if (tx.currency) return tx.currency;
+    return assetById.get(tx.assetId.toString())?.currency ?? "USD";
   };
 
   return (
@@ -315,6 +378,7 @@ export default function TransactionsPage() {
               <TableBody>
                 {filtered.map((tx, i) => {
                   const symbol = assetMap.get(tx.assetId.toString()) ?? "—";
+                  const txCurrency = getTxCurrency(tx);
                   const amount = tx.quantity * tx.price;
                   const isBuyOrDeposit =
                     tx.txType === TxType.Buy || tx.txType === TxType.Deposit;
@@ -331,7 +395,14 @@ export default function TransactionsPage() {
                         <TxTypeBadge txType={tx.txType} />
                       </TableCell>
                       <TableCell className="text-sm font-bold font-mono text-foreground">
-                        {symbol}
+                        <div className="flex flex-col">
+                          <span>{symbol}</span>
+                          {txCurrency !== "USD" && (
+                            <span className="text-[10px] text-muted-foreground font-normal">
+                              {txCurrency}
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right text-sm text-foreground tabular-nums">
                         {tx.quantity.toLocaleString(undefined, {
@@ -339,28 +410,18 @@ export default function TransactionsPage() {
                         })}
                       </TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground tabular-nums">
-                        $
-                        {tx.price.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 6,
-                        })}
+                        {formatCurrency(tx.price, txCurrency)}
                       </TableCell>
                       <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
-                        $
-                        {tx.fee.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                        })}
+                        {formatCurrency(tx.fee, txCurrency)}
                       </TableCell>
                       <TableCell
                         className={`text-right text-sm font-medium tabular-nums ${
                           isBuyOrDeposit ? "text-fin-green" : "text-fin-red"
                         }`}
                       >
-                        {isBuyOrDeposit ? "+" : "-"}$
-                        {amount.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
+                        {isBuyOrDeposit ? "+" : "-"}
+                        {formatCurrency(amount, txCurrency)}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">
                         {tx.note || "—"}
@@ -413,9 +474,7 @@ export default function TransactionsPage() {
                 <Label className="text-foreground text-sm">Asset *</Label>
                 <select
                   value={addForm.assetId}
-                  onChange={(e) =>
-                    setAddForm((p) => ({ ...p, assetId: e.target.value }))
-                  }
+                  onChange={(e) => handleAddAssetChange(e.target.value)}
                   className="mt-1 w-full h-10 px-3 rounded-md bg-muted border border-border text-foreground text-sm"
                   required
                   data-ocid="transactions.asset_select.select"
@@ -448,6 +507,21 @@ export default function TransactionsPage() {
                 </select>
               </div>
             </div>
+
+            <div>
+              <Label className="text-foreground text-sm">Currency *</Label>
+              <CurrencySelect
+                value={addForm.currency}
+                onChange={(v) => setAddForm((p) => ({ ...p, currency: v }))}
+                id="add-currency"
+              />
+              {addForm.currency === "VND" && (
+                <p className="text-[11px] text-fin-green mt-1">
+                  🇻🇳 Vietnamese Dong — giá nhập theo đơn vị VND
+                </p>
+              )}
+            </div>
+
             <div>
               <Label className="text-foreground text-sm">Date *</Label>
               <Input
@@ -478,7 +552,9 @@ export default function TransactionsPage() {
                 />
               </div>
               <div>
-                <Label className="text-foreground text-sm">Price *</Label>
+                <Label className="text-foreground text-sm">
+                  Price ({addForm.currency}) *
+                </Label>
                 <Input
                   type="number"
                   step="any"
@@ -486,7 +562,7 @@ export default function TransactionsPage() {
                   onChange={(e) =>
                     setAddForm((p) => ({ ...p, price: e.target.value }))
                   }
-                  placeholder="0.00"
+                  placeholder={addForm.currency === "VND" ? "0" : "0.00"}
                   className="mt-1 bg-muted border-border"
                   required
                   data-ocid="transactions.price.input"
@@ -494,7 +570,9 @@ export default function TransactionsPage() {
               </div>
             </div>
             <div>
-              <Label className="text-foreground text-sm">Fee</Label>
+              <Label className="text-foreground text-sm">
+                Fee ({addForm.currency})
+              </Label>
               <Input
                 type="number"
                 step="any"
@@ -502,7 +580,7 @@ export default function TransactionsPage() {
                 onChange={(e) =>
                   setAddForm((p) => ({ ...p, fee: e.target.value }))
                 }
-                placeholder="0.00"
+                placeholder="0"
                 className="mt-1 bg-muted border-border"
                 data-ocid="transactions.fee.input"
               />
@@ -572,6 +650,20 @@ export default function TransactionsPage() {
               </div>
             </div>
 
+            <div>
+              <Label className="text-foreground text-sm">Currency *</Label>
+              <CurrencySelect
+                value={editForm.currency}
+                onChange={(v) => setEditForm((p) => ({ ...p, currency: v }))}
+                id="edit-currency"
+              />
+              {editForm.currency === "VND" && (
+                <p className="text-[11px] text-fin-green mt-1">
+                  🇻🇳 Vietnamese Dong — giá theo đơn vị VND
+                </p>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-foreground text-sm">Type *</Label>
@@ -624,7 +716,9 @@ export default function TransactionsPage() {
                 />
               </div>
               <div>
-                <Label className="text-foreground text-sm">Price *</Label>
+                <Label className="text-foreground text-sm">
+                  Price ({editForm.currency}) *
+                </Label>
                 <Input
                   type="number"
                   step="any"
@@ -632,7 +726,7 @@ export default function TransactionsPage() {
                   onChange={(e) =>
                     setEditForm((p) => ({ ...p, price: e.target.value }))
                   }
-                  placeholder="0.00"
+                  placeholder={editForm.currency === "VND" ? "0" : "0.00"}
                   className="mt-1 bg-muted border-border"
                   required
                   data-ocid="transactions.edit.price.input"
@@ -641,7 +735,9 @@ export default function TransactionsPage() {
             </div>
 
             <div>
-              <Label className="text-foreground text-sm">Fee</Label>
+              <Label className="text-foreground text-sm">
+                Fee ({editForm.currency})
+              </Label>
               <Input
                 type="number"
                 step="any"
@@ -649,7 +745,7 @@ export default function TransactionsPage() {
                 onChange={(e) =>
                   setEditForm((p) => ({ ...p, fee: e.target.value }))
                 }
-                placeholder="0.00"
+                placeholder="0"
                 className="mt-1 bg-muted border-border"
                 data-ocid="transactions.edit.fee.input"
               />

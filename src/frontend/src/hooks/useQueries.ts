@@ -8,6 +8,9 @@ import type {
 import { useActor } from "@/hooks/useActor";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+/** Transaction extended with optional currency field (frontend-only until bindgen regenerates) */
+export type TransactionWithCurrency = Transaction & { currency?: string };
+
 export function useGetAssets() {
   const { actor, isFetching } = useActor();
   return useQuery({
@@ -46,11 +49,11 @@ export function useGetPortfolioSummary() {
 
 export function useGetTransactions() {
   const { actor, isFetching } = useActor();
-  return useQuery({
+  return useQuery<TransactionWithCurrency[]>({
     queryKey: ["transactions"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getTransactions();
+      return actor.getTransactions() as Promise<TransactionWithCurrency[]>;
     },
     enabled: !!actor && !isFetching,
   });
@@ -92,7 +95,6 @@ export function useGetProfile() {
 export function getActorFromCache(
   _qc: ReturnType<typeof useQueryClient>,
 ): backendInterface | null {
-  // This function is no longer used — mutations now call useActor() directly.
   return null;
 }
 
@@ -149,9 +151,11 @@ export function useAddTransaction() {
   const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (tx: Transaction) => {
+    mutationFn: async (tx: TransactionWithCurrency) => {
       if (!actor) throw new Error("Not connected");
-      return actor.addTransaction(tx);
+      // Strip frontend-only currency field before sending to backend
+      const { currency: _currency, ...backendTx } = tx;
+      return actor.addTransaction(backendTx as Transaction);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transactions"] });
@@ -165,9 +169,11 @@ export function useUpdateTransaction() {
   const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (tx: Transaction) => {
+    mutationFn: async (tx: TransactionWithCurrency) => {
       if (!actor) throw new Error("Not connected");
-      return actor.updateTransaction(tx);
+      // Strip frontend-only currency field before sending to backend
+      const { currency: _currency, ...backendTx } = tx;
+      return actor.updateTransaction(backendTx as Transaction);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transactions"] });

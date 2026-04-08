@@ -13,7 +13,9 @@ import List "mo:core/List";
 import MixinAuthorization "mo:caffeineai-authorization/MixinAuthorization";
 import AccessControl "mo:caffeineai-authorization/access-control";
 import HttpOutcall "mo:caffeineai-http-outcalls/outcall";
+import Migration "migration";
 
+(with migration = Migration.run)
 actor {
   // Types
   module Asset {
@@ -51,6 +53,7 @@ actor {
       txType : TxType;
       quantity : Float;
       price : Float;
+      currency : Text; // currency of the price (e.g. "USD", "VND")
       fee : Float;
       date : Int;
       note : Text;
@@ -134,6 +137,12 @@ actor {
     ];
   };
 
+  // Exchange rate entry (currency code -> rate vs USD)
+  type ExchangeRateEntry = {
+    currency : Text;
+    rateVsUsd : Float;
+  };
+
   // Stock price result type (Yahoo Finance)
   type StockPrice = {
     symbol : Text;
@@ -149,6 +158,20 @@ actor {
     exchange : Text;
   };
 
+  // Input type for addTransaction that accepts optional currency
+  type AddTransactionInput = {
+    id : Nat;
+    assetId : Nat;
+    txType : Transaction.TxType;
+    quantity : Float;
+    price : Float;
+    currency : Text; // can pass "" to use asset's currency
+    fee : Float;
+    date : Int;
+    note : Text;
+    createdAt : Int;
+  };
+
   // State
   let assets = Map.empty<Principal, Map.Map<Nat, Asset.Public>>();
   let transactions = Map.empty<Principal, Map.Map<Nat, Transaction>>();
@@ -157,6 +180,12 @@ actor {
   var nextAssetId = 1;
   var nextTransactionId = 1;
   var nextSnapshotId = 1;
+
+  // Exchange rate cache: list of (currency, rateVsUsd) pairs, plus timestamp
+  var exchangeRateCache : [(Text, Float)] = [];
+  var exchangeRateCacheTime : Int = 0;
+  // 30-minute cache TTL in nanoseconds
+  let exchangeRateCacheTtl : Int = 30 * 60 * 1_000_000_000;
 
   // Authorization
   let accessControlState = AccessControl.initState();
@@ -523,6 +552,138 @@ actor {
     results.toArray();
   };
 
+  // -------------------------------------------------------
+  // Exchange rates via Frankfurter API (base=USD)
+  // Cached for 30 minutes in stable var
+  // -------------------------------------------------------
+
+  // Parse all currency-rate pairs from Frankfurter JSON response
+  // Response shape: {"amount":1.0,"base":"USD","date":"2024-01-01","rates":{"AED":3.67,"AUD":1.52,...}}
+  func parseExchangeRates(body : Text) : [(Text, Float)] {
+    let result = List.empty<(Text, Float)>();
+    // USD is always 1.0 (base currency)
+    result.add(("USD", 1.0));
+    // Find "rates":{ section
+    let ratesNeedle = "\"rates\":{";
+    switch (textIndexOf(body, ratesNeedle)) {
+      case (null) { return result.toArray() };
+      case (?ratesIdx) {
+        let contentStart = ratesIdx + ratesNeedle.size();
+        let bodySize = body.size();
+        if (contentStart >= bodySize) return result.toArray();
+        let bodyChars = body.toArray();
+        // Find closing brace of rates object
+        var depth = 1;
+        var i = contentStart;
+        var ratesContent = "";
+        while (i < bodySize and depth > 0) {
+          let c = bodyChars[i];
+          if (c == '{') {
+            depth += 1;
+            ratesContent #= Text.fromChar(c);
+          } else if (c == '}') {
+            depth -= 1;
+            if (depth > 0) {
+              ratesContent #= Text.fromChar(c);
+            };
+          } else {
+            ratesContent #= Text.fromChar(c);
+          };
+          i += 1;
+        };
+        // ratesContent is like: "AED":3.67,"AUD":1.52,...
+        // Parse each "CURRENCY":value pair
+        let contentChars = ratesContent.toArray();
+        let contentSize = ratesContent.size();
+        var pos = 0;
+        while (pos < contentSize) {
+          // Skip until we find a quote (start of currency code)
+          if (contentChars[pos] == '\"') {
+            // Read currency code until next quote
+            var currency = "";
+            pos += 1;
+            while (pos < contentSize and contentChars[pos] != '\"') {
+              currency #= Text.fromChar(contentChars[pos]);
+              pos += 1;
+            };
+            // Skip closing quote and colon
+            pos += 1; // skip closing "
+            while (pos < contentSize and (contentChars[pos] == ':' or contentChars[pos] == ' ')) {
+              pos += 1;
+            };
+            // Read number
+            var numStr = "";
+            while (pos < contentSize and ((contentChars[pos] >= '0' and contentChars[pos] <= '9') or contentChars[pos] == '.' or (contentChars[pos] == '-' and numStr == ""))) {
+              numStr #= Text.fromChar(contentChars[pos]);
+              pos += 1;
+            };
+            if (currency != "" and numStr != "") {
+              switch (parseFloatStr(numStr)) {
+                case (?rate) { result.add((currency, rate)) };
+                case (null) {};
+              };
+            };
+          } else {
+            pos += 1;
+          };
+        };
+      };
+    };
+    result.toArray();
+  };
+
+  // Internal: fetch and cache exchange rates from Frankfurter
+  func fetchAndCacheRates() : async [(Text, Float)] {
+    let url = "https://api.frankfurter.app/latest?base=USD";
+    try {
+      let body = await HttpOutcall.httpGetRequest(
+        url,
+        [{ name = "Accept"; value = "application/json" }],
+        transform,
+      );
+      let rates = parseExchangeRates(body);
+      exchangeRateCache := rates;
+      exchangeRateCacheTime := Time.now();
+      rates;
+    } catch (_) {
+      // Return cache even if stale, or empty
+      if (exchangeRateCache.size() > 0) exchangeRateCache
+      else [("USD", 1.0)];
+    };
+  };
+
+  // Public query: returns cached exchange rates (currency code -> rate vs USD)
+  // If cache is stale (>30min), triggers a background refresh but returns stale data
+  public shared func getExchangeRates() : async [(Text, Float)] {
+    let now = Time.now();
+    let cacheAge = now - exchangeRateCacheTime;
+    if (exchangeRateCache.size() == 0 or cacheAge > exchangeRateCacheTtl) {
+      await fetchAndCacheRates();
+    } else {
+      exchangeRateCache;
+    };
+  };
+
+  // Internal: look up rate for a currency vs USD from the cache
+  // Returns 1.0 if not found (treats unknown as USD)
+  func getRateVsUsd(currency : Text) : Float {
+    if (currency == "USD") return 1.0;
+    for ((code, rate) in exchangeRateCache.values()) {
+      if (code == currency) return rate;
+    };
+    1.0; // fallback: treat as USD if rate not found
+  };
+
+  // Convert an amount from srcCurrency to dstCurrency using cached rates
+  // Rates are vs USD, so: amount_in_dst = amount_in_src / rateOfSrc * rateOfDst
+  func convertCurrency(amount : Float, srcCurrency : Text, dstCurrency : Text) : Float {
+    if (srcCurrency == dstCurrency) return amount;
+    let srcRate = getRateVsUsd(srcCurrency);
+    let dstRate = getRateVsUsd(dstCurrency);
+    if (srcRate == 0.0) return amount;
+    amount / srcRate * dstRate;
+  };
+
   // Asset CRUD
   public shared ({ caller }) func addAsset(asset : Asset.Public) : async Nat {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
@@ -580,15 +741,33 @@ actor {
   };
 
   // Transaction CRUD
-  public shared ({ caller }) func addTransaction(tx : Transaction) : async Nat {
+  // addTransaction: currency field defaults to asset's currency if empty string is passed
+  public shared ({ caller }) func addTransaction(tx : AddTransactionInput) : async Nat {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can add transactions");
+    };
+    // Resolve currency: use provided currency, or fall back to asset's currency
+    let resolvedCurrency = if (tx.currency == "") {
+      let userAssets = getCallerAssets(caller);
+      switch (userAssets.get(tx.assetId)) {
+        case (?asset) { asset.currency };
+        case (null) { "USD" };
+      };
+    } else {
+      tx.currency;
     };
     let id = nextTransactionId;
     nextTransactionId += 1;
     let newTx : Transaction = {
-      tx with
       id;
+      assetId = tx.assetId;
+      txType = tx.txType;
+      quantity = tx.quantity;
+      price = tx.price;
+      currency = resolvedCurrency;
+      fee = tx.fee;
+      date = tx.date;
+      note = tx.note;
       createdAt = Time.now();
     };
     let userTxs = getCallerTransactions(caller);
@@ -611,7 +790,8 @@ actor {
     getCallerTransactions(caller).get(id);
   };
 
-  public shared ({ caller }) func updateTransaction(tx : Transaction) : async () {
+  // updateTransaction: currency field defaults to asset's currency if empty string is passed
+  public shared ({ caller }) func updateTransaction(tx : AddTransactionInput) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can update transactions");
     };
@@ -619,7 +799,38 @@ actor {
     if (not userTxs.containsKey(tx.id)) {
       Runtime.trap("Transaction not found");
     };
-    userTxs.add(tx.id, tx);
+    // Resolve currency
+    let resolvedCurrency = if (tx.currency == "") {
+      // Try to keep existing currency from the stored transaction
+      switch (userTxs.get(tx.id)) {
+        case (?existing) { existing.currency };
+        case (null) {
+          let userAssets = getCallerAssets(caller);
+          switch (userAssets.get(tx.assetId)) {
+            case (?asset) { asset.currency };
+            case (null) { "USD" };
+          };
+        };
+      };
+    } else {
+      tx.currency;
+    };
+    let updatedTx : Transaction = {
+      id = tx.id;
+      assetId = tx.assetId;
+      txType = tx.txType;
+      quantity = tx.quantity;
+      price = tx.price;
+      currency = resolvedCurrency;
+      fee = tx.fee;
+      date = tx.date;
+      note = tx.note;
+      createdAt = switch (userTxs.get(tx.id)) {
+        case (?existing) { existing.createdAt };
+        case (null) { Time.now() };
+      };
+    };
+    userTxs.add(tx.id, updatedTx);
     transactions.add(caller, userTxs);
   };
 
@@ -711,7 +922,7 @@ actor {
     userProfiles.get(caller);
   };
 
-  // Holdings Calculation
+  // Holdings Calculation (backward-compatible, no currency conversion)
   public query ({ caller }) func getHoldings() : async [Holding] {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can view holdings");
@@ -791,8 +1002,15 @@ actor {
         switch (tx.txType) {
           case (#Buy) {
             totalQuantity += tx.quantity;
-            totalCost += tx.quantity * tx.price + tx.fee;
-            totalBuys += tx.quantity * tx.price + tx.fee;
+            // Use transaction's own currency for cost calculation
+            // Convert to asset's currency for consistency
+            let txCostInAssetCurrency = convertCurrency(
+              tx.quantity * tx.price + tx.fee,
+              tx.currency,
+              asset.currency
+            );
+            totalCost += txCostInAssetCurrency;
+            totalBuys += txCostInAssetCurrency;
             buyQuantity += tx.quantity;
           };
           case (#Sell) {
@@ -826,7 +1044,44 @@ actor {
     holdings.toArray();
   };
 
-  // Portfolio Summary
+  // Holdings with currency conversion to a target currency
+  // Uses cached exchange rates — caller should ensure getExchangeRates() was called recently
+  public query ({ caller }) func getHoldingsInCurrency(targetCurrency : Text) : async [Holding] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view holdings");
+    };
+    let baseHoldings = calcHoldings(caller);
+    if (targetCurrency == "") return baseHoldings;
+
+    baseHoldings.map(
+      func(h) {
+        if (h.currency == targetCurrency) {
+          h;
+        } else {
+          let convertedValue = convertCurrency(h.totalValue, h.currency, targetCurrency);
+          let convertedCost = convertCurrency(h.totalCost, h.currency, targetCurrency);
+          let convertedGainLoss = convertedValue - convertedCost;
+          let convertedGainLossPercent = if (convertedCost > 0.0) {
+            convertedGainLoss / convertedCost * 100.0;
+          } else { 0.0 };
+          let convertedAvgCost = convertCurrency(h.averageCost, h.currency, targetCurrency);
+          let convertedCurrentPrice = convertCurrency(h.currentPrice, h.currency, targetCurrency);
+          {
+            h with
+            currency = targetCurrency;
+            totalValue = convertedValue;
+            totalCost = convertedCost;
+            gainLoss = convertedGainLoss;
+            gainLossPercent = convertedGainLossPercent;
+            averageCost = convertedAvgCost;
+            currentPrice = convertedCurrentPrice;
+          };
+        };
+      }
+    );
+  };
+
+  // Portfolio Summary (backward-compatible, no currency conversion)
   public query ({ caller }) func getPortfolioSummary() : async PortfolioSummary {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can view portfolio summary");
@@ -859,6 +1114,73 @@ actor {
         };
         case (?existing) {
           allocationMap.add(catKey, { value = existing.value + holding.totalValue; category = holding.category });
+        };
+      };
+    };
+
+    let allocation = allocationMap.values().toArray().map(
+      func(entry) {
+        {
+          category = entry.category;
+          value = entry.value;
+          percentage = if (totalValue > 0.0) { entry.value / totalValue * 100.0 } else { 0.0 };
+        };
+      }
+    );
+
+    {
+      totalValue;
+      totalCost;
+      totalGainLoss = gainLoss;
+      totalGainLossPercent = gainLossPercent;
+      dailyChange = 0.0;
+      allocation;
+    };
+  };
+
+  // Portfolio Summary with all values converted to targetCurrency
+  // Uses cached exchange rates
+  public query ({ caller }) func getPortfolioSummaryInCurrency(targetCurrency : Text) : async PortfolioSummary {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can view portfolio summary");
+    };
+    let holdings = calcHoldings(caller);
+    var totalValue = 0.0;
+    var totalCost = 0.0;
+
+    for (holding in holdings.values()) {
+      if (targetCurrency == "" or holding.currency == targetCurrency) {
+        totalValue += holding.totalValue;
+        totalCost += holding.totalCost;
+      } else {
+        totalValue += convertCurrency(holding.totalValue, holding.currency, targetCurrency);
+        totalCost += convertCurrency(holding.totalCost, holding.currency, targetCurrency);
+      };
+    };
+
+    let gainLoss = totalValue - totalCost;
+    let gainLossPercent = if (totalCost > 0.0) { gainLoss / totalCost * 100.0 } else { 0.0 };
+
+    let allocationMap = Map.empty<Text, { value : Float; category : Asset.Category }>();
+
+    for (holding in holdings.values()) {
+      let catKey = switch (holding.category) {
+        case (#Stock) { "Stock" };
+        case (#Crypto) { "Crypto" };
+        case (#Forex) { "Forex" };
+        case (#Cash) { "Cash" };
+      };
+      let convertedValue = if (targetCurrency == "" or holding.currency == targetCurrency) {
+        holding.totalValue;
+      } else {
+        convertCurrency(holding.totalValue, holding.currency, targetCurrency);
+      };
+      switch (allocationMap.get(catKey)) {
+        case (null) {
+          allocationMap.add(catKey, { value = convertedValue; category = holding.category });
+        };
+        case (?existing) {
+          allocationMap.add(catKey, { value = existing.value + convertedValue; category = holding.category });
         };
       };
     };
