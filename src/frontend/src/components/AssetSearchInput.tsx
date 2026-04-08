@@ -32,7 +32,7 @@ export const COMMODITY_LIST: SearchResult[] = [
   { symbol: "BZ=F", name: "Brent Crude Oil", displaySymbol: "BZ=F" },
 ];
 
-/** Metal symbols fetched via MetalMetric on the backend */
+/** Metal symbols — fetched via Yahoo Finance futures (GC=F, SI=F, PL=F, PA=F) on the backend */
 export const METAL_SYMBOLS = new Set(["XAU", "XAG", "XPT", "XPD"]);
 /** Oil symbols fetched via Yahoo Finance on the backend */
 export const OIL_SYMBOLS = new Set(["CL=F", "BZ=F"]);

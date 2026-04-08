@@ -187,7 +187,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* 2-col second row: Metals + Oil */}
+          {/* 2-col second row: Metals + Oil (both Yahoo Finance) */}
           <div className="grid grid-cols-2 gap-3 text-center">
             <div className="bg-muted/50 rounded-lg p-3">
               <div className="flex items-center justify-center gap-1 mb-1">
@@ -196,7 +196,7 @@ export default function SettingsPage() {
                   {t("badges.Commodity")} — XAU, XAG, XPT, XPD
                 </span>
               </div>
-              <p className="text-[11px] text-muted-foreground">MetalMetric</p>
+              <p className="text-[11px] text-muted-foreground">Yahoo Finance</p>
               <p className="text-[10px] text-fin-green mt-0.5">
                 {t("settings.autoFree")}
               </p>

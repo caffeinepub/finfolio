@@ -174,7 +174,7 @@ const en = {
     searchNotConnected: "Not connected — please wait and try again",
     searchFailed: "Search failed — check your connection",
     commodityBanner:
-      "Live metal price provided automatically via MetalMetric (XAU, XAG, XPT, XPD). No manual entry needed.",
+      "Live metal price provided automatically via Yahoo Finance (GC=F, SI=F, PL=F, PA=F). No manual entry needed.",
     commodityOilBanner:
       "Live oil price provided automatically via Yahoo Finance. No manual entry needed.",
     realEstateBanner:
@@ -243,7 +243,7 @@ const en = {
     priceDataSubtitle: "Live market price feeds",
     autoFree: "Auto • Free",
     priceDataNote:
-      "All prices are fetched automatically every 30 seconds. Stocks use Yahoo Finance, metals use MetalMetric, oil uses Yahoo Finance — no API key required.",
+      "All prices are fetched automatically every 30 seconds. Stocks and commodities (metals + oil) all use Yahoo Finance — no API key required.",
     aboutTitle: "About FinFolio",
     version: "Version 1.0.0",
     aboutDesc1: "Decentralized portfolio management on the Internet Computer.",
@@ -439,7 +439,7 @@ const vi: typeof en = {
     searchNotConnected: "Chưa kết nối — vui lòng đợi và thử lại",
     searchFailed: "Tìm kiếm thất bại — kiểm tra kết nối",
     commodityBanner:
-      "Giá kim loại được cung cấp tự động qua MetalMetric (XAU, XAG, XPT, XPD). Không cần nhập thủ công.",
+      "Giá kim loại được cung cấp tự động qua Yahoo Finance (GC=F, SI=F, PL=F, PA=F). Không cần nhập thủ công.",
     commodityOilBanner:
       "Giá dầu được cung cấp tự động qua Yahoo Finance. Không cần nhập thủ công.",
     realEstateBanner: "Nhập giá thủ công — không có giá thực cho bất động sản.",
@@ -507,7 +507,7 @@ const vi: typeof en = {
     priceDataSubtitle: "Nguồn giá thị trường trực tiếp",
     autoFree: "Tự động • Miễn phí",
     priceDataNote:
-      "Tất cả giá được lấy tự động mỗi 30 giây. Cổ phiếu dùng Yahoo Finance, kim loại dùng MetalMetric, dầu dùng Yahoo Finance — không cần API key.",
+      "Tất cả giá được lấy tự động mỗi 30 giây. Cổ phiếu và hàng hóa (kim loại + dầu) đều dùng Yahoo Finance — không cần API key.",
     aboutTitle: "Về FinFolio",
     version: "Phiên bản 1.0.0",
     aboutDesc1: "Quản lý danh mục phi tập trung trên Internet Computer.",

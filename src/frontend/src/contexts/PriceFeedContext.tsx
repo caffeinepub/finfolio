@@ -42,12 +42,7 @@ function getCoinGeckoId(symbol: string): string {
   return COINGECKO_ID_MAP[symbol.toUpperCase()] ?? symbol.toLowerCase();
 }
 
-export type PriceSource =
-  | "coingecko"
-  | "frankfurter"
-  | "yahoo"
-  | "manual"
-  | "metalmetric";
+export type PriceSource = "coingecko" | "frankfurter" | "yahoo" | "manual";
 export type PriceStatus = "live" | "stale" | "error" | "no-key";
 
 export interface PriceEntry {
@@ -333,6 +328,14 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
       OIL_SYMBOLS.has(a.symbol.toUpperCase()),
     );
 
+    // Yahoo Finance futures symbol mapping for metals
+    const METAL_TO_YAHOO: Record<string, string> = {
+      XAU: "GC=F",
+      XAG: "SI=F",
+      XPT: "PL=F",
+      XPD: "PA=F",
+    };
+
     // Collect all asset currencies for exchange rate prefetch
     const assetCurrencies = [
       ...new Set(assets.map((a) => a.currency.toUpperCase())),
@@ -343,35 +346,33 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
 
     const cryptoSymbols = cryptoAssets.map((a) => a.symbol);
 
-    // Build per-metal fetch promises using getMetalPriceBySymbol
+    // Build per-metal fetch promises via Yahoo Finance futures symbols
     const metalFetchPromises = metalAssets.map(async (asset) => {
       const sym = asset.symbol.toUpperCase();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const actorAny = actor as any;
-      if (actor && typeof actorAny.getMetalPriceBySymbol === "function") {
+      const yahooSymbol = METAL_TO_YAHOO[sym];
+      if (!yahooSymbol) {
+        console.warn(
+          `[PriceFeed] No Yahoo futures symbol mapping for metal: ${sym}`,
+        );
+        return { asset, result: null };
+      }
+      if (actor?.getStockPrice) {
         try {
-          const res = await actorAny.getMetalPriceBySymbol(sym);
-          if (res && typeof res.price === "number" && res.price > 0) {
+          const res = await actor.getStockPrice(yahooSymbol);
+          if (res.ok && res.price > 0) {
             return {
               asset,
-              result: { price: res.price as number, change24h: 0 },
+              result: { price: res.price, change24h: res.change24h },
             };
           }
-        } catch {
-          // fall through to cache/manual
-        }
-      } else if (actor?.getMetalPrice) {
-        // Fallback: legacy getMetalPrice() for XAU only
-        try {
-          const res = await actor.getMetalPrice();
-          if (res && typeof res.price === "number" && res.price > 0) {
-            return {
-              asset,
-              result: { price: res.price as number, change24h: 0 },
-            };
-          }
-        } catch {
-          // fall through
+          console.warn(
+            `[PriceFeed] Metal price fetch returned no data for ${sym} (${yahooSymbol}): ok=${res.ok}, price=${res.price}`,
+          );
+        } catch (err) {
+          console.warn(
+            `[PriceFeed] Metal price fetch failed for ${sym} (${yahooSymbol}):`,
+            err,
+          );
         }
       }
       return { asset, result: null };
@@ -388,8 +389,14 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
               result: { price: res.price, change24h: res.change24h },
             };
           }
-        } catch {
-          // fall through
+          console.warn(
+            `[PriceFeed] Oil price fetch returned no data for ${asset.symbol}: ok=${res.ok}, price=${res.price}`,
+          );
+        } catch (err) {
+          console.warn(
+            `[PriceFeed] Oil price fetch failed for ${asset.symbol}:`,
+            err,
+          );
         }
       }
       return { asset, result: null };
@@ -552,14 +559,14 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
-    // ── Commodity: Metals (XAU, XAG, XPT, XPD) via MetalMetric ──
+    // ── Commodity: Metals (XAU, XAG, XPT, XPD) via Yahoo Finance futures ──
     for (const { asset, result } of metalResults) {
       const key = asset.symbol;
       if (result && result.price > 0) {
         const entry: PriceEntry = {
           price: result.price,
-          change24h: 0,
-          source: "metalmetric",
+          change24h: result.change24h,
+          source: "yahoo",
           status: "live",
           updatedAt: now,
         };
