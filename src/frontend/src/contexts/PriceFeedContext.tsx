@@ -29,12 +29,12 @@ const COINGECKO_ID_MAP: Record<string, string> = {
   ATOM: "cosmos",
   LTC: "litecoin",
   BCH: "bitcoin-cash",
-  NEAR: "near-protocol",
+  NEAR: "near",
   APT: "aptos",
   ARB: "arbitrum",
   OP: "optimism",
   INJ: "injective-protocol",
-  TON: "the-open-network",
+  TON: "toncoin",
   TRX: "tron",
 };
 
