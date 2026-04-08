@@ -26,6 +26,7 @@ import { formatCurrency, formatDate } from "@/utils/formatters";
 import { ArrowLeftRight } from "lucide-react";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Area,
   AreaChart,
@@ -75,7 +76,6 @@ function calcHoldingsQuantity(
   convert: (amount: number, from: string, to: string) => number,
   baseCurrency: string,
 ): Map<string, { quantity: number; totalCost: number }> {
-  // Use string keys to avoid bigint vs number runtime type mismatch in Map lookups
   const map = new Map<string, { quantity: number; totalCost: number }>();
   for (const asset of assets) {
     map.set(String(asset.id), { quantity: 0, totalCost: 0 });
@@ -86,7 +86,6 @@ function calcHoldingsQuantity(
     const txCurrency = tx.currency ?? asset?.currency ?? "USD";
     const current = map.get(txIdKey) ?? { quantity: 0, totalCost: 0 };
     if (tx.txType === TxType.Buy || tx.txType === TxType.Deposit) {
-      // Convert cost to baseCurrency
       const costInBase = convert(
         tx.quantity * tx.price + tx.fee,
         txCurrency,
@@ -109,6 +108,7 @@ function calcHoldingsQuantity(
 const SNAPSHOT_THROTTLE_MS = 5 * 60 * 1000;
 
 export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
+  const { t } = useTranslation();
   const rangeMs = getDateRangeMs(dateRange);
   const NS_PER_MS = 1_000_000n;
   const { startDate, endDate } = useMemo(() => {
@@ -135,9 +135,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
   const { data: profile } = useGetProfile();
   const addSnapshot = useAddSnapshot();
 
-  // baseCurrency from user profile, fallback USD
   const baseCurrency = profile?.baseCurrency ?? "USD";
-
   const lastSnapshotTimeRef = useRef<number>(0);
 
   const assetMap = useMemo(() => {
@@ -148,7 +146,6 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
     return m;
   }, [assets]);
 
-  // Build asset lookup map (string keys to avoid bigint/number mismatch at runtime)
   const assetById = useMemo(() => {
     const m = new Map<string, Public__1>();
     if (assets) for (const a of assets) m.set(String(a.id), a);
@@ -187,7 +184,6 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
 
       let currentValue: number;
       if (asset.category === Category.Cash) {
-        // Convert cash value to baseCurrency
         currentValue = convert(
           asset.manualPrice,
           asset.currency || "USD",
@@ -200,22 +196,17 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
         );
       } else {
         const entry = prices[asset.symbol];
-        // Guard against price=0 from a failed API call — fallback to manualPrice
         const livePrice =
           entry && entry.price > 0 ? entry.price : asset.manualPrice;
-
-        // CoinGecko prices are always in USD — use "USD" as price currency for crypto.
-        // For stocks/forex, use the asset's declared currency.
         const priceCurrency =
           asset.category === Category.Crypto ? "USD" : asset.currency || "USD";
-
         const valueInPriceCurrency = quantity * livePrice;
         currentValue = convert(
           valueInPriceCurrency,
           priceCurrency,
           baseCurrency,
         );
-        totalCost += cost; // cost already in baseCurrency (via calcHoldingsQuantity)
+        totalCost += cost;
       }
 
       totalValue += currentValue;
@@ -252,16 +243,12 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
     for (const asset of assets) {
       if (asset.category === Category.Cash) continue;
       const entry = prices[asset.symbol];
-      // Skip assets with no live price or zero 24h change data
       if (!entry || entry.price <= 0 || entry.change24h === 0) continue;
       const holding = holdingsMap.get(String(asset.id));
       const quantity = holding?.quantity ?? 0;
       if (quantity <= 0) continue;
-
-      // Use USD as price currency for crypto (CoinGecko always returns USD)
       const priceCurrency =
         asset.category === Category.Crypto ? "USD" : asset.currency || "USD";
-
       const valueInBase = convert(
         quantity * entry.price,
         priceCurrency,
@@ -334,13 +321,11 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
           );
         } else {
           const entry = updatedPrices[asset.symbol];
-          // Guard against price=0 from a failed API call — fallback to manualPrice
           const livePrice =
             entry && entry.price > 0 ? entry.price : asset.manualPrice;
           const holding = hMap.get(String(asset.id));
           const qty = holding?.quantity ?? 0;
           if (qty <= 0) continue;
-          // CoinGecko prices are in USD for crypto
           const priceCurrency =
             asset.category === Category.Crypto
               ? "USD"
@@ -369,12 +354,9 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
 
   const isLoading = assetsLoading || txLoading || pricesLoading;
 
-  // Chart Y-axis tick formatter — compact in baseCurrency
   const yAxisFormatter = useCallback(
     (v: number) => {
-      if (baseCurrency === "VND") {
-        return `${(v / 1_000_000).toFixed(0)}M₫`;
-      }
+      if (baseCurrency === "VND") return `${(v / 1_000_000).toFixed(0)}M₫`;
       return `$${(v / 1000).toFixed(0)}k`;
     },
     [baseCurrency],
@@ -387,7 +369,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <KpiCard
-          title={`Total Portfolio Value (${baseCurrency})`}
+          title={`${t("overview.totalPortfolioValue")} (${baseCurrency})`}
           value={
             isLoading
               ? "—"
@@ -404,7 +386,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
           sparkline={sparklineData}
         />
         <KpiCard
-          title={`Total Gain / Loss (${baseCurrency})`}
+          title={`${t("overview.totalGainLoss")} (${baseCurrency})`}
           value={
             isLoading
               ? "—"
@@ -415,7 +397,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
           index={1}
         />
         <KpiCard
-          title="Daily Change"
+          title={t("overview.dailyChange")}
           value={
             isLoading
               ? "—"
@@ -429,7 +411,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
           delta={dailyChangeStats.dailyChangePercent ?? 0}
           subtitle={
             dailyChangeStats.dailyChangePercent === null
-              ? "Awaiting price data"
+              ? t("overview.awaitingPriceData")
               : undefined
           }
           positive={(dailyChangeStats.dailyChangeAmount ?? 0) >= 0}
@@ -449,7 +431,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
           <div className="flex items-center justify-between mb-5">
             <div>
               <h2 className="text-base font-bold text-foreground">
-                Portfolio Performance
+                {t("overview.portfolioPerformance")}
               </h2>
               <p className="text-sm text-muted-foreground">{dateRange}</p>
             </div>
@@ -461,11 +443,10 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
           ) : chartData.length === 0 ? (
             <div className="h-56 flex flex-col items-center justify-center text-center gap-2">
               <p className="text-muted-foreground text-sm font-medium">
-                No performance history yet.
+                {t("overview.noHistoryYet")}
               </p>
               <p className="text-xs text-muted-foreground max-w-xs">
-                Data will be recorded automatically as you use the app. Come
-                back after a few minutes to see your portfolio chart.
+                {t("overview.noHistoryDesc")}
               </p>
             </div>
           ) : (
@@ -521,7 +502,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
                   }}
                   formatter={(v: number) => [
                     formatCurrency(v, baseCurrency),
-                    "Portfolio Value",
+                    t("overview.portfolioValue"),
                   ]}
                 />
                 <Area
@@ -544,7 +525,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
           className="bg-card border border-border rounded-xl p-5 shadow-card"
         >
           <h2 className="text-base font-bold text-foreground mb-5">
-            Asset Allocation
+            {t("overview.assetAllocation")}
           </h2>
           {isLoading ? (
             <div className="h-56 flex items-center justify-center">
@@ -552,7 +533,9 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
             </div>
           ) : portfolioStats.allocationByCategory.length === 0 ? (
             <div className="h-56 flex flex-col items-center justify-center text-center">
-              <p className="text-muted-foreground text-sm">No assets yet.</p>
+              <p className="text-muted-foreground text-sm">
+                {t("overview.noAssetsYet")}
+              </p>
             </div>
           ) : (
             <>
@@ -626,7 +609,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
                             }}
                           >
                             <span style={{ color: "oklch(0.65 0.02 240)" }}>
-                              Value
+                              {t("overview.valueCol")}
                             </span>
                             <span>{formatCurrency(value, baseCurrency)}</span>
                           </div>
@@ -638,7 +621,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
                             }}
                           >
                             <span style={{ color: "oklch(0.65 0.02 240)" }}>
-                              Share
+                              {t("overview.shareCol")}
                             </span>
                             <span>{pct.toFixed(1)}%</span>
                           </div>
@@ -650,7 +633,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
               </ResponsiveContainer>
               <div className="text-center -mt-2 mb-3">
                 <p className="text-xs text-muted-foreground">
-                  Total ({baseCurrency})
+                  {t("overview.total")} ({baseCurrency})
                 </p>
                 <p className="text-lg font-bold text-foreground">
                   {formatCurrency(
@@ -697,14 +680,14 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
         className="bg-card border border-border rounded-xl p-5 shadow-card"
       >
         <h2 className="text-base font-bold text-foreground mb-4">
-          Recent Transactions
+          {t("overview.recentTransactions")}
         </h2>
         {txLoading ? (
           <PageLoader />
         ) : recentTx.length === 0 ? (
           <EmptyState
-            title="No transactions yet"
-            description="Add your first transaction to start tracking your portfolio."
+            title={t("overview.noTransactionsYet")}
+            description={t("overview.noTransactionsDesc")}
             icon={ArrowLeftRight}
           />
         ) : (
@@ -713,22 +696,22 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-muted-foreground text-xs">
-                    Date
+                    {t("overview.date")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs">
-                    Type
+                    {t("overview.typeCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs">
-                    Asset
+                    {t("overview.assetCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right">
-                    Qty
+                    {t("overview.qty")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right">
-                    Price
+                    {t("overview.priceCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right">
-                    Amount ({baseCurrency})
+                    {t("overview.amountCol")} ({baseCurrency})
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -763,12 +746,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
                         {formatCurrency(tx.price, txCurrency)}
                       </TableCell>
                       <TableCell
-                        className={`text-xs text-right font-medium tabular-nums ${
-                          tx.txType === TxType.Buy ||
-                          tx.txType === TxType.Deposit
-                            ? "text-fin-green"
-                            : "text-fin-red"
-                        }`}
+                        className={`text-xs text-right font-medium tabular-nums ${tx.txType === TxType.Buy || tx.txType === TxType.Deposit ? "text-fin-green" : "text-fin-red"}`}
                       >
                         {formatCurrency(amountInBase, baseCurrency)}
                       </TableCell>

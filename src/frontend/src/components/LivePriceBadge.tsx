@@ -1,6 +1,7 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePrices } from "@/contexts/PriceFeedContext";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 const SOURCE_LABELS: Record<string, string> = {
   coingecko: "CoinGecko",
@@ -12,7 +13,6 @@ const SOURCE_LABELS: Record<string, string> = {
 function formatPrice(price: number, currency = "USD"): string {
   if (price === 0) return "--";
   try {
-    // VND prices are large integers -- no decimal places needed
     if (currency === "VND") {
       return new Intl.NumberFormat("vi-VN", {
         style: "currency",
@@ -44,6 +44,7 @@ export function LivePriceBadge({
   className,
 }: LivePriceBadgeProps) {
   const { prices, isLoading } = usePrices();
+  const { t } = useTranslation();
   const entry = prices[symbol];
 
   if (isLoading && !entry) {
@@ -59,7 +60,9 @@ export function LivePriceBadge({
     return (
       <div className={cn("flex flex-col items-end gap-0.5", className)}>
         <span className="text-sm text-muted-foreground tabular-nums">--</span>
-        <span className="text-[10px] text-muted-foreground">Manual</span>
+        <span className="text-[10px] text-muted-foreground">
+          {t("liveprice.manual")}
+        </span>
       </div>
     );
   }
@@ -76,6 +79,13 @@ export function LivePriceBadge({
         : entry.status === "error"
           ? "bg-fin-red"
           : "bg-muted-foreground";
+
+  const statusSuffix =
+    entry.status === "no-key"
+      ? ` (${t("liveprice.noKey")})`
+      : entry.status === "error"
+        ? ` (${t("liveprice.error")})`
+        : "";
 
   return (
     <div className={cn("flex flex-col items-end gap-0.5", className)}>
@@ -99,8 +109,7 @@ export function LivePriceBadge({
       </div>
       <span className="text-[10px] text-muted-foreground">
         {SOURCE_LABELS[entry.source] ?? entry.source}
-        {entry.status === "no-key" && " (no key)"}
-        {entry.status === "error" && " (error)"}
+        {statusSuffix}
       </span>
     </div>
   );

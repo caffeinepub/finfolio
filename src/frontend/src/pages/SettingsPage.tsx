@@ -7,9 +7,11 @@ import { useGetProfile, useUpdateProfile } from "@/hooks/useQueries";
 import { Loader2, TrendingUp, User } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 export default function SettingsPage() {
+  const { t } = useTranslation();
   const { data: profile, isLoading } = useGetProfile();
   const { identity } = useInternetIdentity();
   const updateProfile = useUpdateProfile();
@@ -34,9 +36,9 @@ export default function SettingsPage() {
         createdAt: profile?.createdAt ?? BigInt(Date.now()),
         user: identity.getPrincipal(),
       });
-      toast.success("Profile saved successfully");
+      toast.success(t("settings.profileSaved"));
     } catch {
-      toast.error("Failed to save profile");
+      toast.error(t("settings.profileFailed"));
     }
   };
 
@@ -50,9 +52,11 @@ export default function SettingsPage() {
       className="max-w-lg space-y-4"
     >
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+        <h1 className="text-2xl font-bold text-foreground">
+          {t("settings.title")}
+        </h1>
         <p className="text-muted-foreground text-sm mt-0.5">
-          Manage your profile and preferences
+          {t("settings.subtitle")}
         </p>
       </div>
 
@@ -63,7 +67,9 @@ export default function SettingsPage() {
             <User className="w-5 h-5 text-fin-blue" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-foreground">Profile</h2>
+            <h2 className="text-base font-semibold text-foreground">
+              {t("settings.profileTitle")}
+            </h2>
             <p className="text-xs text-muted-foreground">
               {identity
                 ? `${identity.getPrincipal().toString().slice(0, 24)}...`
@@ -75,13 +81,13 @@ export default function SettingsPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <Label htmlFor="name" className="text-foreground text-sm">
-              Display Name
+              {t("settings.displayNameLabel")}
             </Label>
             <Input
               id="name"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Your name"
+              placeholder={t("settings.displayNamePlaceholder")}
               className="mt-1 bg-muted border-border"
               data-ocid="settings.name.input"
             />
@@ -89,7 +95,7 @@ export default function SettingsPage() {
 
           <div>
             <Label htmlFor="currency" className="text-foreground text-sm">
-              Base Currency
+              {t("settings.baseCurrencyLabel")}
             </Label>
             <select
               id="currency"
@@ -115,10 +121,10 @@ export default function SettingsPage() {
             {updateProfile.isPending ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Saving...
+                {t("common.saving")}
               </>
             ) : (
-              "Save Changes"
+              t("common.save")
             )}
           </Button>
         </form>
@@ -132,10 +138,10 @@ export default function SettingsPage() {
           </div>
           <div>
             <h2 className="text-base font-semibold text-foreground">
-              Price Data
+              {t("settings.priceDataTitle")}
             </h2>
             <p className="text-xs text-muted-foreground">
-              Live market price feeds
+              {t("settings.priceDataSubtitle")}
             </p>
           </div>
         </div>
@@ -146,37 +152,42 @@ export default function SettingsPage() {
               <div className="flex items-center justify-center gap-1 mb-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-fin-green animate-pulse inline-block" />
                 <span className="text-xs font-semibold text-foreground">
-                  Crypto
+                  {t("badges.Crypto")}
                 </span>
               </div>
               <p className="text-[11px] text-muted-foreground">CoinGecko</p>
-              <p className="text-[10px] text-fin-green mt-0.5">Auto • Free</p>
+              <p className="text-[10px] text-fin-green mt-0.5">
+                {t("settings.autoFree")}
+              </p>
             </div>
             <div className="bg-muted/50 rounded-lg p-3">
               <div className="flex items-center justify-center gap-1 mb-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-fin-green animate-pulse inline-block" />
                 <span className="text-xs font-semibold text-foreground">
-                  Forex
+                  {t("badges.Forex")}
                 </span>
               </div>
               <p className="text-[11px] text-muted-foreground">Frankfurter</p>
-              <p className="text-[10px] text-fin-green mt-0.5">Auto • Free</p>
+              <p className="text-[10px] text-fin-green mt-0.5">
+                {t("settings.autoFree")}
+              </p>
             </div>
             <div className="bg-muted/50 rounded-lg p-3">
               <div className="flex items-center justify-center gap-1 mb-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-fin-green animate-pulse inline-block" />
                 <span className="text-xs font-semibold text-foreground">
-                  Stocks
+                  {t("badges.Stock")}
                 </span>
               </div>
               <p className="text-[11px] text-muted-foreground">Yahoo Finance</p>
-              <p className="text-[10px] text-fin-green mt-0.5">Auto • Free</p>
+              <p className="text-[10px] text-fin-green mt-0.5">
+                {t("settings.autoFree")}
+              </p>
             </div>
           </div>
 
           <div className="text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2.5 leading-relaxed">
-            All prices are fetched automatically every 30 seconds. Stocks use
-            Yahoo Finance — no API key required.
+            {t("settings.priceDataNote")}
           </div>
         </div>
       </div>
@@ -184,12 +195,12 @@ export default function SettingsPage() {
       {/* About Card */}
       <div className="bg-card border border-border rounded-xl p-6 shadow-card">
         <h2 className="text-base font-semibold text-foreground mb-3">
-          About FinFolio
+          {t("settings.aboutTitle")}
         </h2>
         <div className="space-y-2 text-sm text-muted-foreground">
-          <p>Version 1.0.0</p>
-          <p>Decentralized portfolio management on the Internet Computer.</p>
-          <p>Track stocks, crypto, forex, and cash in one place.</p>
+          <p>{t("settings.version")}</p>
+          <p>{t("settings.aboutDesc1")}</p>
+          <p>{t("settings.aboutDesc2")}</p>
         </div>
       </div>
     </motion.div>

@@ -48,6 +48,7 @@ import {
 import { ArrowLeftRight, Edit2, Plus, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 const TODAY = formatDateInput(Date.now());
@@ -100,6 +101,7 @@ function CurrencySelect({
 }
 
 export default function TransactionsPage() {
+  const { t } = useTranslation();
   const { data: transactions, isLoading: txLoading } = useGetTransactions();
   const { data: assets } = useGetAssets();
   const addTransaction = useAddTransaction();
@@ -197,7 +199,7 @@ export default function TransactionsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!addForm.assetId) {
-      toast.error("Please select an asset");
+      toast.error(t("transactions.pleaseSelectAsset"));
       return;
     }
     try {
@@ -213,10 +215,10 @@ export default function TransactionsPage() {
         note: addForm.note,
         currency: addForm.currency,
       });
-      toast.success("Transaction added");
+      toast.success(t("transactions.txAdded"));
       setDialogOpen(false);
     } catch {
-      toast.error("Failed to add transaction");
+      toast.error(t("transactions.failedToAdd"));
     }
   };
 
@@ -236,10 +238,10 @@ export default function TransactionsPage() {
         note: editForm.note,
         currency: editForm.currency,
       });
-      toast.success("Transaction updated");
+      toast.success(t("transactions.txUpdated"));
       closeEdit();
     } catch {
-      toast.error("Failed to update transaction");
+      toast.error(t("transactions.failedToUpdate"));
     }
   };
 
@@ -247,10 +249,10 @@ export default function TransactionsPage() {
     if (!deleteTarget) return;
     try {
       await deleteTransaction.mutateAsync(deleteTarget.id);
-      toast.success("Transaction deleted");
+      toast.success(t("transactions.txDeleted"));
       setDeleteTarget(null);
     } catch {
-      toast.error("Failed to delete transaction");
+      toast.error(t("transactions.failedToDelete"));
     }
   };
 
@@ -258,6 +260,14 @@ export default function TransactionsPage() {
   const getTxCurrency = (tx: TransactionWithCurrency): string => {
     if (tx.currency) return tx.currency;
     return assetById.get(tx.assetId.toString())?.currency ?? "USD";
+  };
+
+  const filterLabels: Record<string, string> = {
+    All: t("common.all"),
+    [TxType.Buy]: t("badges.Buy"),
+    [TxType.Sell]: t("badges.Sell"),
+    [TxType.Deposit]: t("badges.Deposit"),
+    [TxType.Withdraw]: t("badges.Withdraw"),
   };
 
   return (
@@ -268,9 +278,11 @@ export default function TransactionsPage() {
     >
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Transactions</h1>
+          <h1 className="text-2xl font-bold text-foreground">
+            {t("transactions.title")}
+          </h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            Full transaction history
+            {t("transactions.subtitle")}
           </p>
         </div>
         <Button
@@ -278,26 +290,26 @@ export default function TransactionsPage() {
           className="bg-fin-green text-background hover:bg-fin-green/90 gap-2"
           data-ocid="transactions.add_button"
         >
-          <Plus className="w-4 h-4" /> Add Transaction
+          <Plus className="w-4 h-4" /> {t("transactions.addTransaction")}
         </Button>
       </div>
 
       {/* Filters */}
       <div className="flex gap-2 mb-4 flex-wrap">
         {["All", TxType.Buy, TxType.Sell, TxType.Deposit, TxType.Withdraw].map(
-          (t) => (
+          (type) => (
             <button
               type="button"
-              key={t}
-              onClick={() => setFilterType(t)}
+              key={type}
+              onClick={() => setFilterType(type)}
               data-ocid="transactions.filter.tab"
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                filterType === t
+                filterType === type
                   ? "bg-fin-green/20 text-fin-green border border-fin-green/30"
                   : "bg-muted text-muted-foreground border border-transparent hover:text-foreground"
               }`}
             >
-              {t}
+              {filterLabels[type] ?? type}
             </button>
           ),
         )}
@@ -309,7 +321,7 @@ export default function TransactionsPage() {
             className="h-8 px-2 rounded-full bg-muted border border-transparent text-xs text-muted-foreground focus:outline-none focus:border-fin-green/30"
             data-ocid="transactions.asset.select"
           >
-            <option value="all">All Assets</option>
+            <option value="all">{t("common.allAssets")}</option>
             {assets.map((a) => (
               <option key={a.id.toString()} value={a.id.toString()}>
                 {a.symbol}
@@ -327,8 +339,8 @@ export default function TransactionsPage() {
         ) : filtered.length === 0 ? (
           <div className="p-6">
             <EmptyState
-              title="No transactions found"
-              description="Add a transaction to start tracking your portfolio performance."
+              title={t("transactions.noTransactionsFound")}
+              description={t("transactions.noTransactionsDesc")}
               icon={ArrowLeftRight}
               action={
                 <Button
@@ -336,7 +348,8 @@ export default function TransactionsPage() {
                   className="bg-fin-green text-background hover:bg-fin-green/90"
                   data-ocid="transactions.empty_state"
                 >
-                  <Plus className="w-4 h-4 mr-1" /> Add Transaction
+                  <Plus className="w-4 h-4 mr-1" />{" "}
+                  {t("transactions.addTransaction")}
                 </Button>
               }
             />
@@ -347,31 +360,31 @@ export default function TransactionsPage() {
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-muted-foreground text-xs pl-5">
-                    Date
+                    {t("transactions.dateCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs">
-                    Type
+                    {t("transactions.typeCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs">
-                    Asset
+                    {t("transactions.assetCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right">
-                    Quantity
+                    {t("transactions.quantityCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right">
-                    Price
+                    {t("transactions.priceCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right">
-                    Fee
+                    {t("transactions.feeCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right">
-                    Amount
+                    {t("transactions.amountCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs">
-                    Note
+                    {t("transactions.noteCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right pr-5">
-                    Actions
+                    {t("transactions.actionsCol")}
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -465,13 +478,15 @@ export default function TransactionsPage() {
         >
           <DialogHeader>
             <DialogTitle className="text-foreground">
-              Add Transaction
+              {t("transactions.addTransaction")}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-foreground text-sm">Asset *</Label>
+                <Label className="text-foreground text-sm">
+                  {t("transactions.assetLabel")} *
+                </Label>
                 <select
                   value={addForm.assetId}
                   onChange={(e) => handleAddAssetChange(e.target.value)}
@@ -479,7 +494,7 @@ export default function TransactionsPage() {
                   required
                   data-ocid="transactions.asset_select.select"
                 >
-                  <option value="">Select asset...</option>
+                  <option value="">{t("transactions.selectAsset")}</option>
                   {assets?.map((a) => (
                     <option key={a.id.toString()} value={a.id.toString()}>
                       {a.symbol} — {a.name}
@@ -488,7 +503,9 @@ export default function TransactionsPage() {
                 </select>
               </div>
               <div>
-                <Label className="text-foreground text-sm">Type *</Label>
+                <Label className="text-foreground text-sm">
+                  {t("transactions.typeLabel")} *
+                </Label>
                 <select
                   value={addForm.txType}
                   onChange={(e) =>
@@ -500,16 +517,20 @@ export default function TransactionsPage() {
                   className="mt-1 w-full h-10 px-3 rounded-md bg-muted border border-border text-foreground text-sm"
                   data-ocid="transactions.type.select"
                 >
-                  <option value={TxType.Buy}>Buy</option>
-                  <option value={TxType.Sell}>Sell</option>
-                  <option value={TxType.Deposit}>Deposit</option>
-                  <option value={TxType.Withdraw}>Withdraw</option>
+                  <option value={TxType.Buy}>{t("badges.Buy")}</option>
+                  <option value={TxType.Sell}>{t("badges.Sell")}</option>
+                  <option value={TxType.Deposit}>{t("badges.Deposit")}</option>
+                  <option value={TxType.Withdraw}>
+                    {t("badges.Withdraw")}
+                  </option>
                 </select>
               </div>
             </div>
 
             <div>
-              <Label className="text-foreground text-sm">Currency *</Label>
+              <Label className="text-foreground text-sm">
+                {t("transactions.currencyLabel")} *
+              </Label>
               <CurrencySelect
                 value={addForm.currency}
                 onChange={(v) => setAddForm((p) => ({ ...p, currency: v }))}
@@ -517,13 +538,15 @@ export default function TransactionsPage() {
               />
               {addForm.currency === "VND" && (
                 <p className="text-[11px] text-fin-green mt-1">
-                  🇻🇳 Vietnamese Dong — giá nhập theo đơn vị VND
+                  {t("transactions.vndNote")}
                 </p>
               )}
             </div>
 
             <div>
-              <Label className="text-foreground text-sm">Date *</Label>
+              <Label className="text-foreground text-sm">
+                {t("transactions.dateLabel")} *
+              </Label>
               <Input
                 type="date"
                 value={addForm.date}
@@ -537,7 +560,9 @@ export default function TransactionsPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-foreground text-sm">Quantity *</Label>
+                <Label className="text-foreground text-sm">
+                  {t("transactions.quantityLabel")} *
+                </Label>
                 <Input
                   type="number"
                   step="any"
@@ -553,7 +578,7 @@ export default function TransactionsPage() {
               </div>
               <div>
                 <Label className="text-foreground text-sm">
-                  Price ({addForm.currency}) *
+                  {t("transactions.priceLabel")} ({addForm.currency}) *
                 </Label>
                 <Input
                   type="number"
@@ -571,7 +596,7 @@ export default function TransactionsPage() {
             </div>
             <div>
               <Label className="text-foreground text-sm">
-                Fee ({addForm.currency})
+                {t("transactions.feeLabel")} ({addForm.currency})
               </Label>
               <Input
                 type="number"
@@ -586,13 +611,15 @@ export default function TransactionsPage() {
               />
             </div>
             <div>
-              <Label className="text-foreground text-sm">Note</Label>
+              <Label className="text-foreground text-sm">
+                {t("transactions.noteLabel")}
+              </Label>
               <Input
                 value={addForm.note}
                 onChange={(e) =>
                   setAddForm((p) => ({ ...p, note: e.target.value }))
                 }
-                placeholder="Optional note"
+                placeholder={t("common.optional")}
                 className="mt-1 bg-muted border-border"
                 data-ocid="transactions.note.input"
               />
@@ -605,7 +632,7 @@ export default function TransactionsPage() {
                 className="text-muted-foreground"
                 data-ocid="transactions.cancel_button"
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 type="submit"
@@ -613,7 +640,9 @@ export default function TransactionsPage() {
                 className="bg-fin-green text-background hover:bg-fin-green/90"
                 data-ocid="transactions.submit_button"
               >
-                {addTransaction.isPending ? "Adding..." : "Add Transaction"}
+                {addTransaction.isPending
+                  ? t("transactions.addingTx")
+                  : t("transactions.addTransaction")}
               </Button>
             </DialogFooter>
           </form>
@@ -632,7 +661,7 @@ export default function TransactionsPage() {
           <DialogHeader>
             <div className="flex items-center gap-2">
               <DialogTitle className="text-foreground">
-                Sửa giao dịch
+                {t("transactions.editTransaction")}
               </DialogTitle>
               {editingTransaction && (
                 <TxTypeBadge txType={editingTransaction.txType} />
@@ -642,7 +671,9 @@ export default function TransactionsPage() {
           <form onSubmit={handleEditSubmit} className="space-y-4">
             {/* Asset — read-only */}
             <div>
-              <Label className="text-foreground text-sm">Asset</Label>
+              <Label className="text-foreground text-sm">
+                {t("transactions.assetLabel")}
+              </Label>
               <div className="mt-1 w-full h-10 px-3 rounded-md bg-muted/50 border border-border text-muted-foreground text-sm flex items-center font-mono font-bold">
                 {editingTransaction
                   ? (assetMap.get(editingTransaction.assetId.toString()) ?? "—")
@@ -651,7 +682,9 @@ export default function TransactionsPage() {
             </div>
 
             <div>
-              <Label className="text-foreground text-sm">Currency *</Label>
+              <Label className="text-foreground text-sm">
+                {t("transactions.currencyLabel")} *
+              </Label>
               <CurrencySelect
                 value={editForm.currency}
                 onChange={(v) => setEditForm((p) => ({ ...p, currency: v }))}
@@ -659,14 +692,16 @@ export default function TransactionsPage() {
               />
               {editForm.currency === "VND" && (
                 <p className="text-[11px] text-fin-green mt-1">
-                  🇻🇳 Vietnamese Dong — giá theo đơn vị VND
+                  {t("transactions.vndNoteEdit")}
                 </p>
               )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-foreground text-sm">Type *</Label>
+                <Label className="text-foreground text-sm">
+                  {t("transactions.typeLabel")} *
+                </Label>
                 <select
                   value={editForm.txType}
                   onChange={(e) =>
@@ -678,14 +713,18 @@ export default function TransactionsPage() {
                   className="mt-1 w-full h-10 px-3 rounded-md bg-muted border border-border text-foreground text-sm focus:outline-none focus:border-fin-green/50"
                   data-ocid="transactions.edit.type.select"
                 >
-                  <option value={TxType.Buy}>Buy</option>
-                  <option value={TxType.Sell}>Sell</option>
-                  <option value={TxType.Deposit}>Deposit</option>
-                  <option value={TxType.Withdraw}>Withdraw</option>
+                  <option value={TxType.Buy}>{t("badges.Buy")}</option>
+                  <option value={TxType.Sell}>{t("badges.Sell")}</option>
+                  <option value={TxType.Deposit}>{t("badges.Deposit")}</option>
+                  <option value={TxType.Withdraw}>
+                    {t("badges.Withdraw")}
+                  </option>
                 </select>
               </div>
               <div>
-                <Label className="text-foreground text-sm">Date *</Label>
+                <Label className="text-foreground text-sm">
+                  {t("transactions.dateLabel")} *
+                </Label>
                 <Input
                   type="date"
                   value={editForm.date}
@@ -701,7 +740,9 @@ export default function TransactionsPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-foreground text-sm">Quantity *</Label>
+                <Label className="text-foreground text-sm">
+                  {t("transactions.quantityLabel")} *
+                </Label>
                 <Input
                   type="number"
                   step="any"
@@ -717,7 +758,7 @@ export default function TransactionsPage() {
               </div>
               <div>
                 <Label className="text-foreground text-sm">
-                  Price ({editForm.currency}) *
+                  {t("transactions.priceLabel")} ({editForm.currency}) *
                 </Label>
                 <Input
                   type="number"
@@ -736,7 +777,7 @@ export default function TransactionsPage() {
 
             <div>
               <Label className="text-foreground text-sm">
-                Fee ({editForm.currency})
+                {t("transactions.feeLabel")} ({editForm.currency})
               </Label>
               <Input
                 type="number"
@@ -752,13 +793,15 @@ export default function TransactionsPage() {
             </div>
 
             <div>
-              <Label className="text-foreground text-sm">Note</Label>
+              <Label className="text-foreground text-sm">
+                {t("transactions.noteLabel")}
+              </Label>
               <Input
                 value={editForm.note}
                 onChange={(e) =>
                   setEditForm((p) => ({ ...p, note: e.target.value }))
                 }
-                placeholder="Optional note"
+                placeholder={t("common.optional")}
                 className="mt-1 bg-muted border-border"
                 data-ocid="transactions.edit.note.input"
               />
@@ -772,7 +815,7 @@ export default function TransactionsPage() {
                 className="text-muted-foreground"
                 data-ocid="transactions.edit.cancel_button"
               >
-                Hủy
+                {t("transactions.cancelBtn")}
               </Button>
               <Button
                 type="submit"
@@ -780,7 +823,9 @@ export default function TransactionsPage() {
                 className="bg-fin-green text-background hover:bg-fin-green/90"
                 data-ocid="transactions.edit.submit_button"
               >
-                {updateTransaction.isPending ? "Đang lưu..." : "Lưu thay đổi"}
+                {updateTransaction.isPending
+                  ? t("transactions.savingBtn")
+                  : t("transactions.saveChanges")}
               </Button>
             </DialogFooter>
           </form>
@@ -795,14 +840,14 @@ export default function TransactionsPage() {
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground">
-              Delete Transaction
+              {t("transactions.deleteTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this{" "}
+              {t("transactions.deleteDesc")}{" "}
               <strong className="text-foreground">
                 {deleteTarget?.txType}
               </strong>{" "}
-              transaction? This action cannot be undone.
+              {t("transactions.deleteDescSuffix")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -810,14 +855,16 @@ export default function TransactionsPage() {
               className="border-border"
               data-ocid="transactions.delete.cancel_button"
             >
-              Cancel
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-ocid="transactions.delete.confirm_button"
             >
-              {deleteTransaction.isPending ? "Deleting..." : "Delete"}
+              {deleteTransaction.isPending
+                ? t("common.deleting")
+                : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

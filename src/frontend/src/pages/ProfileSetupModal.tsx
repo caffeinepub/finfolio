@@ -4,16 +4,17 @@ import { Label } from "@/components/ui/label";
 import { useActor } from "@/hooks/useActor";
 import { useInternetIdentity } from "@/hooks/useInternetIdentity";
 import { useUpdateProfile } from "@/hooks/useQueries";
-import { useQueryClient } from "@tanstack/react-query";
 import { TrendingUp } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   onComplete: () => void;
 }
 
 export default function ProfileSetupModal({ onComplete }: Props) {
+  const { t } = useTranslation();
   const { identity } = useInternetIdentity();
   const { actor } = useActor();
   const [displayName, setDisplayName] = useState("");
@@ -45,22 +46,22 @@ export default function ProfileSetupModal({ onComplete }: Props) {
             <TrendingUp className="w-4 h-4 text-fin-green" />
           </div>
           <h2 className="text-xl font-bold text-foreground">
-            Set up your profile
+            {t("profile.setupTitle")}
           </h2>
         </div>
         <p className="text-muted-foreground text-sm mb-6">
-          Welcome to FinFolio! Tell us a bit about yourself to get started.
+          {t("profile.setupSubtitle")}
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="displayName" className="text-foreground">
-              Display Name
+              {t("profile.displayNameLabel")}
             </Label>
             <Input
               id="displayName"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="e.g. Alex Nguyen"
+              placeholder={t("profile.displayNamePlaceholder")}
               className="mt-1 bg-muted border-border"
               required
               data-ocid="profile_setup.input"
@@ -68,7 +69,7 @@ export default function ProfileSetupModal({ onComplete }: Props) {
           </div>
           <div>
             <Label htmlFor="currency" className="text-foreground">
-              Base Currency
+              {t("profile.baseCurrencyLabel")}
             </Label>
             <select
               id="currency"
@@ -90,7 +91,9 @@ export default function ProfileSetupModal({ onComplete }: Props) {
             className="w-full bg-fin-green text-background hover:bg-fin-green/90 font-semibold"
             data-ocid="profile_setup.submit_button"
           >
-            {updateProfile.isPending ? "Saving..." : "Get Started"}
+            {updateProfile.isPending
+              ? t("profile.saving")
+              : t("profile.getStarted")}
           </Button>
         </form>
       </motion.div>

@@ -41,6 +41,7 @@ import {
 import { Coins, Pencil, Plus, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 const EMPTY_ASSET: Omit<Public__1, "id" | "createdAt"> = {
@@ -52,20 +53,13 @@ const EMPTY_ASSET: Omit<Public__1, "id" | "createdAt"> = {
   note: "",
 };
 
-/**
- * Determine the native currency that a live price is quoted in.
- * - Crypto: CoinGecko always returns USD prices regardless of asset.currency
- * - Forex:  Frankfurter rate is expressed as USD per 1 unit
- * - Stock:  Yahoo Finance returns VND for VN stocks (.VN suffix), USD otherwise
- * - Cash:   Value stored in asset.currency
- */
 function getLivePriceCurrency(
   category: Category,
   assetCurrency: string,
   symbol: string,
 ): string {
-  if (category === Category.Crypto) return "USD"; // CoinGecko always USD
-  if (category === Category.Forex) return "USD"; // rate vs USD
+  if (category === Category.Crypto) return "USD";
+  if (category === Category.Forex) return "USD";
   if (category === Category.Stock) {
     if (symbol.toUpperCase().endsWith(".VN")) return "VND";
     return "USD";
@@ -73,59 +67,7 @@ function getLivePriceCurrency(
   return assetCurrency || "USD";
 }
 
-/**
- * Determine if manual price input should be shown.
- * All stocks now use Yahoo Finance via backend -- no API key required.
- */
-function getPriceFieldConfig(
-  category: Category,
-  _symbol: string,
-): {
-  show: boolean;
-  label: string;
-  helper: string;
-  placeholder: string;
-  liveSource: string;
-} {
-  switch (category) {
-    case Category.Crypto:
-    case Category.Forex:
-      return {
-        show: false,
-        label: "",
-        helper: "",
-        placeholder: "",
-        liveSource: category === Category.Crypto ? "CoinGecko" : "Frankfurter",
-      };
-    case Category.Stock:
-      // All stocks (VN and international) use Yahoo Finance via backend proxy
-      return {
-        show: false,
-        label: "",
-        helper: "",
-        placeholder: "",
-        liveSource: "Yahoo Finance",
-      };
-    case Category.Cash:
-      return {
-        show: true,
-        label: "Value",
-        helper: "No live price available for cash. Enter the current value.",
-        placeholder: "0.00",
-        liveSource: "",
-      };
-    default:
-      return {
-        show: true,
-        label: "Manual Price",
-        helper: "Used when live price is unavailable.",
-        placeholder: "0.00",
-        liveSource: "",
-      };
-  }
-}
-
-function formatCurrency(value: number, currency: string): string {
+function formatCurrencyVal(value: number, currency: string): string {
   try {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -138,7 +80,14 @@ function formatCurrency(value: number, currency: string): string {
   }
 }
 
+function displaySymbol(symbol: string): string {
+  if (symbol.endsWith(".VN")) return symbol.replace(".VN", "");
+  if (symbol.includes(":")) return symbol.split(":").pop()!.toUpperCase();
+  return symbol;
+}
+
 export default function AssetsPage() {
+  const { t } = useTranslation();
   const { data: assets, isLoading } = useGetAssets();
   const addAsset = useAddAsset();
   const updateAsset = useUpdateAsset();
@@ -171,28 +120,25 @@ export default function AssetsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.symbol.trim()) {
-      toast.error("Please select an asset first");
+      toast.error(t("assets.selectAsset"));
       return;
     }
     try {
       if (editTarget) {
-        await updateAsset.mutateAsync({
-          ...editTarget,
-          ...form,
-        });
-        toast.success("Asset updated");
+        await updateAsset.mutateAsync({ ...editTarget, ...form });
+        toast.success(t("assets.assetUpdated"));
       } else {
         await addAsset.mutateAsync({
           id: 0n,
           createdAt: BigInt(Date.now()),
           ...form,
         });
-        toast.success("Asset added");
+        toast.success(t("assets.assetAdded"));
       }
       setDialogOpen(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`Failed to save asset: ${msg}`);
+      toast.error(`${t("assets.failedToSave")} ${msg}`);
     }
   };
 
@@ -200,25 +146,26 @@ export default function AssetsPage() {
     if (!deleteTarget) return;
     try {
       await deleteAsset.mutateAsync(deleteTarget.id);
-      toast.success("Asset deleted");
+      toast.success(t("assets.assetDeleted"));
       setDeleteTarget(null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`Failed to delete asset: ${msg}`);
+      toast.error(`${t("assets.failedToDelete")} ${msg}`);
     }
   };
+
   const isCash = form.category === Category.Cash;
   const isPending = addAsset.isPending || updateAsset.isPending;
 
-  // Reactive: derive price field config from current form category + symbol
-  const priceFieldConfig = getPriceFieldConfig(form.category, form.symbol);
-
-  // Display symbol nicely (strip .VN suffix for UI)
-  function displaySymbol(symbol: string): string {
-    if (symbol.endsWith(".VN")) return symbol.replace(".VN", "");
-    if (symbol.includes(":")) return symbol.split(":").pop()!.toUpperCase();
-    return symbol;
-  }
+  // Derive if price field should show
+  const showPriceField = isCash;
+  const liveSource = !isCash
+    ? form.category === Category.Crypto
+      ? "CoinGecko"
+      : form.category === Category.Forex
+        ? "Frankfurter"
+        : "Yahoo Finance"
+    : "";
 
   return (
     <motion.div
@@ -228,9 +175,11 @@ export default function AssetsPage() {
     >
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Assets</h1>
+          <h1 className="text-2xl font-bold text-foreground">
+            {t("assets.title")}
+          </h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            Manage your tracked assets
+            {t("assets.subtitle")}
           </p>
         </div>
         <Button
@@ -238,7 +187,7 @@ export default function AssetsPage() {
           className="bg-fin-green text-background hover:bg-fin-green/90 gap-2"
           data-ocid="assets.add_button"
         >
-          <Plus className="w-4 h-4" /> Add Asset
+          <Plus className="w-4 h-4" /> {t("assets.addAsset")}
         </Button>
       </div>
 
@@ -250,8 +199,8 @@ export default function AssetsPage() {
         ) : !assets || assets.length === 0 ? (
           <div className="p-6">
             <EmptyState
-              title="No assets yet"
-              description="Add your first asset to start tracking investments."
+              title={t("assets.noAssetsYet")}
+              description={t("assets.noAssetsDesc")}
               icon={Coins}
               action={
                 <Button
@@ -259,7 +208,7 @@ export default function AssetsPage() {
                   className="bg-fin-green text-background hover:bg-fin-green/90"
                   data-ocid="assets.empty_state"
                 >
-                  <Plus className="w-4 h-4 mr-1" /> Add Asset
+                  <Plus className="w-4 h-4 mr-1" /> {t("assets.addAsset")}
                 </Button>
               }
             />
@@ -270,22 +219,22 @@ export default function AssetsPage() {
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-muted-foreground text-xs pl-5">
-                    Symbol
+                    {t("assets.symbolCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs">
-                    Name
+                    {t("assets.nameCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs">
-                    Category
+                    {t("assets.categoryCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs">
-                    Currency
+                    {t("assets.currencyCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right">
-                    Live Price
+                    {t("assets.livePriceCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right pr-5">
-                    Actions
+                    {t("assets.actionsCol")}
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -313,7 +262,7 @@ export default function AssetsPage() {
                     <TableCell className="text-right">
                       {asset.category === Category.Cash ? (
                         <span className="text-sm font-mono text-foreground">
-                          {formatCurrency(asset.manualPrice, asset.currency)}
+                          {formatCurrencyVal(asset.manualPrice, asset.currency)}
                         </span>
                       ) : (
                         <LivePriceBadge
@@ -364,21 +313,21 @@ export default function AssetsPage() {
         >
           <DialogHeader>
             <DialogTitle className="text-foreground">
-              {editTarget ? "Edit Asset" : "Add Asset"}
+              {editTarget ? t("assets.editAsset") : t("assets.addAsset")}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Category + Currency row */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-foreground text-sm">Category *</Label>
+                <Label className="text-foreground text-sm">
+                  {t("assets.categoryLabel")} *
+                </Label>
                 <select
                   value={form.category}
                   onChange={(e) =>
                     setForm((p) => ({
                       ...p,
                       category: e.target.value as Category,
-                      // Reset symbol/name when switching categories
                       symbol: "",
                       name: "",
                       manualPrice: 0,
@@ -387,14 +336,16 @@ export default function AssetsPage() {
                   className="mt-1 w-full h-10 px-3 rounded-md bg-muted border border-border text-foreground text-sm"
                   data-ocid="assets.category.select"
                 >
-                  <option value={Category.Stock}>Stock</option>
-                  <option value={Category.Crypto}>Crypto</option>
-                  <option value={Category.Forex}>Forex</option>
-                  <option value={Category.Cash}>Cash</option>
+                  <option value={Category.Stock}>{t("badges.Stock")}</option>
+                  <option value={Category.Crypto}>{t("badges.Crypto")}</option>
+                  <option value={Category.Forex}>{t("badges.Forex")}</option>
+                  <option value={Category.Cash}>{t("badges.Cash")}</option>
                 </select>
               </div>
               <div>
-                <Label className="text-foreground text-sm">Currency *</Label>
+                <Label className="text-foreground text-sm">
+                  {t("assets.currencyLabel")} *
+                </Label>
                 <select
                   value={form.currency}
                   onChange={(e) =>
@@ -414,11 +365,12 @@ export default function AssetsPage() {
               </div>
             </div>
 
-            {/* Symbol + Name: search autocomplete for non-Cash, plain text for Cash */}
             {isCash ? (
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-foreground text-sm">Symbol *</Label>
+                  <Label className="text-foreground text-sm">
+                    {t("common.symbol")} *
+                  </Label>
                   <Input
                     value={form.symbol}
                     onChange={(e) =>
@@ -434,7 +386,9 @@ export default function AssetsPage() {
                   />
                 </div>
                 <div>
-                  <Label className="text-foreground text-sm">Name *</Label>
+                  <Label className="text-foreground text-sm">
+                    {t("common.name")} *
+                  </Label>
                   <Input
                     value={form.name}
                     onChange={(e) =>
@@ -449,7 +403,9 @@ export default function AssetsPage() {
               </div>
             ) : (
               <div>
-                <Label className="text-foreground text-sm">Asset *</Label>
+                <Label className="text-foreground text-sm">
+                  {t("assets.assetLabel")} *
+                </Label>
                 <div className="mt-1">
                   <AssetSearchInput
                     category={form.category}
@@ -470,8 +426,7 @@ export default function AssetsPage() {
               </div>
             )}
 
-            {/* Conditional Manual Price field */}
-            {priceFieldConfig.show && (
+            {showPriceField && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
@@ -479,7 +434,7 @@ export default function AssetsPage() {
                 transition={{ duration: 0.2 }}
               >
                 <Label className="text-foreground text-sm">
-                  {priceFieldConfig.label}
+                  {t("assets.cashValueLabel")}
                 </Label>
                 <Input
                   type="number"
@@ -491,18 +446,17 @@ export default function AssetsPage() {
                       manualPrice: Number.parseFloat(e.target.value) || 0,
                     }))
                   }
-                  placeholder={priceFieldConfig.placeholder}
+                  placeholder="0.00"
                   className="mt-1 bg-muted border-border"
                   data-ocid="assets.price.input"
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  {priceFieldConfig.helper}
+                  {t("assets.cashValueHelper")}
                 </p>
               </motion.div>
             )}
 
-            {/* Info banner when price field is hidden (has live source) */}
-            {!priceFieldConfig.show && priceFieldConfig.liveSource && (
+            {!showPriceField && liveSource && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -511,20 +465,22 @@ export default function AssetsPage() {
               >
                 <span className="inline-block w-2 h-2 rounded-full bg-fin-green mt-0.5 shrink-0 animate-pulse" />
                 <p className="text-[12px] text-fin-green leading-snug">
-                  Live price provided automatically via{" "}
-                  {priceFieldConfig.liveSource}. No manual entry needed.
+                  {t("assets.liveSourcePrefix")} {liveSource}.{" "}
+                  {t("assets.noManualEntry")}
                 </p>
               </motion.div>
             )}
 
             <div>
-              <Label className="text-foreground text-sm">Note</Label>
+              <Label className="text-foreground text-sm">
+                {t("assets.noteLabel")}
+              </Label>
               <Input
                 value={form.note}
                 onChange={(e) =>
                   setForm((p) => ({ ...p, note: e.target.value }))
                 }
-                placeholder="Optional note"
+                placeholder={t("common.optional")}
                 className="mt-1 bg-muted border-border"
                 data-ocid="assets.note.input"
               />
@@ -537,7 +493,7 @@ export default function AssetsPage() {
                 className="text-muted-foreground"
                 data-ocid="assets.cancel_button"
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 type="submit"
@@ -545,7 +501,11 @@ export default function AssetsPage() {
                 className="bg-fin-green text-background hover:bg-fin-green/90"
                 data-ocid="assets.submit_button"
               >
-                {isPending ? "Saving..." : editTarget ? "Update" : "Add Asset"}
+                {isPending
+                  ? t("assets.saving")
+                  : editTarget
+                    ? t("assets.update")
+                    : t("assets.addAsset")}
               </Button>
             </DialogFooter>
           </form>
@@ -560,14 +520,14 @@ export default function AssetsPage() {
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground">
-              Delete Asset
+              {t("assets.deleteTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete{" "}
+              {t("assets.deleteDesc")}{" "}
               <strong className="text-foreground">
                 {deleteTarget?.symbol}
               </strong>
-              ? This will also remove all associated holdings data.
+              {t("assets.deleteDescSuffix")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -575,14 +535,16 @@ export default function AssetsPage() {
               className="border-border"
               data-ocid="assets.delete.cancel_button"
             >
-              Cancel
+              {t("common.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-ocid="assets.delete.confirm_button"
             >
-              {deleteAsset.isPending ? "Deleting..." : "Delete"}
+              {deleteAsset.isPending
+                ? t("common.deleting")
+                : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
