@@ -1,8 +1,7 @@
-import type { backendInterface } from "@/backend";
 import { Category, type Public__1 } from "@/backend.d";
+import { useActor } from "@/hooks/useActor";
 import { useGetAssets } from "@/hooks/useQueries";
 import { convertCurrency } from "@/utils/formatters";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   createContext,
   useCallback,
@@ -101,22 +100,6 @@ const PREFETCH_CURRENCIES = [
   "HKD",
   "KRW",
 ];
-
-function getActorFromCache(
-  qc: ReturnType<typeof useQueryClient>,
-): backendInterface | null {
-  const queries = qc.getQueriesData<backendInterface>({ queryKey: ["actor"] });
-  let bestActor: backendInterface | null = null;
-  for (const [queryKey, data] of queries) {
-    if (!data) continue;
-    const principal = queryKey[1] as string | undefined;
-    if (principal && principal !== "undefined" && principal !== "2vxsx-fae") {
-      return data;
-    }
-    bestActor = data;
-  }
-  return bestActor;
-}
 
 async function fetchCryptoPrices(
   symbols: string[],
@@ -298,7 +281,7 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
   // Cache: last successfully fetched prices per symbol — prevents zero values on API failure
   const pricesCacheRef = useRef<PriceMap>({});
   const { data: assets } = useGetAssets();
-  const queryClient = useQueryClient();
+  const { actor } = useActor();
 
   // Build the convert function using current exchangeRates and crypto prices
   const convert = useCallback(
@@ -328,8 +311,6 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
     }
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
-
-    const actor = getActorFromCache(queryClient);
 
     const cryptoAssets = assets.filter((a) => a.category === Category.Crypto);
     const forexAssets = assets.filter((a) => a.category === Category.Forex);
@@ -516,7 +497,7 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
     }
 
     isFetchingRef.current = false;
-  }, [assets, queryClient]);
+  }, [assets, actor]);
 
   useEffect(() => {
     if (!assets || assets.length === 0) {

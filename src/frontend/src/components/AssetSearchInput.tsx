@@ -1,7 +1,6 @@
 import { Category } from "@/backend.d";
 import { Input } from "@/components/ui/input";
-import { getActorFromCache } from "@/hooks/useQueries";
-import { useQueryClient } from "@tanstack/react-query";
+import { useActor } from "@/hooks/useActor";
 import { Loader2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -141,7 +140,7 @@ export function AssetSearchInput({
   const [stockSearchError, setStockSearchError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const queryClient = useQueryClient();
+  const { actor } = useActor();
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -215,7 +214,6 @@ export function AssetSearchInput({
         setIsSearching(true);
         setStockSearchError(null);
         try {
-          const actor = getActorFromCache(queryClient);
           if (!actor) {
             setStockSearchError("Not connected — please wait and try again");
             setResults([]);
