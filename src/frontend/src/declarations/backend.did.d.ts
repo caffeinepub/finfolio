@@ -60,6 +60,17 @@ export interface Public__1 {
   'manualPrice' : number,
   'symbol' : string,
 }
+export interface StockPrice {
+  'ok' : boolean,
+  'change24h' : number,
+  'price' : number,
+  'symbol' : string,
+}
+export interface StockSearchResult {
+  'name' : string,
+  'exchange' : string,
+  'symbol' : string,
+}
 export interface Transaction {
   'id' : bigint,
   'fee' : number,
@@ -71,6 +82,15 @@ export interface Transaction {
   'txType' : TxType,
   'price' : number,
 }
+export interface TransformationInput {
+  'context' : Uint8Array,
+  'response' : http_request_result,
+}
+export interface TransformationOutput {
+  'status' : bigint,
+  'body' : Uint8Array,
+  'headers' : Array<http_header>,
+}
 export type TxType = { 'Buy' : null } |
   { 'Withdraw' : null } |
   { 'Deposit' : null } |
@@ -78,8 +98,14 @@ export type TxType = { 'Buy' : null } |
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
+export interface http_header { 'value' : string, 'name' : string }
+export interface http_request_result {
+  'status' : bigint,
+  'body' : Uint8Array,
+  'headers' : Array<http_header>,
+}
 export interface _SERVICE {
-  '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  '_initializeAccessControl' : ActorMethod<[], undefined>,
   'addAsset' : ActorMethod<[Public__1], bigint>,
   'addSnapshot' : ActorMethod<[PortfolioSnapshot], bigint>,
   'addTransaction' : ActorMethod<[Transaction], bigint>,
@@ -94,11 +120,15 @@ export interface _SERVICE {
   'getPortfolioSummary' : ActorMethod<[], PortfolioSummary>,
   'getProfile' : ActorMethod<[], [] | [Public]>,
   'getSnapshots' : ActorMethod<[bigint, bigint], Array<PortfolioSnapshot>>,
+  'getStockPrice' : ActorMethod<[string], StockPrice>,
   'getTransaction' : ActorMethod<[bigint], [] | [Transaction]>,
   'getTransactions' : ActorMethod<[], Array<Transaction>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [Public]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'saveCallerUserProfile' : ActorMethod<[Public], undefined>,
+  'searchStocks' : ActorMethod<[string], Array<StockSearchResult>>,
+  'transform' : ActorMethod<[TransformationInput], TransformationOutput>,
+  'transformSearch' : ActorMethod<[TransformationInput], TransformationOutput>,
   'updateAsset' : ActorMethod<[Public__1], undefined>,
   'updateProfile' : ActorMethod<[Public], undefined>,
   'updateTransaction' : ActorMethod<[Transaction], undefined>,

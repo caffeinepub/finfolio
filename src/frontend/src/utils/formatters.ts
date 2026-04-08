@@ -33,8 +33,20 @@ export function formatPercent(value: number): string {
   return `${sign}${value.toFixed(2)}%`;
 }
 
+/**
+ * ICP timestamps are nanoseconds. Detect by magnitude (> year 3000 in ms = nanoseconds)
+ * and convert to milliseconds before formatting.
+ */
 export function formatDate(timestamp: bigint | number): string {
-  const ms = typeof timestamp === "bigint" ? Number(timestamp) : timestamp;
+  let ms: number;
+  if (typeof timestamp === "bigint") {
+    // ICP nanosecond timestamps are ~19 digits; ms timestamps are ~13 digits
+    // If the bigint is > 1e15 (far future as ms), treat as nanoseconds
+    const raw = Number(timestamp);
+    ms = raw > 1e15 ? Math.floor(raw / 1_000_000) : raw;
+  } else {
+    ms = timestamp > 1e15 ? Math.floor(timestamp / 1_000_000) : timestamp;
+  }
   return new Date(ms).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -43,7 +55,13 @@ export function formatDate(timestamp: bigint | number): string {
 }
 
 export function formatDateInput(timestamp: bigint | number): string {
-  const ms = typeof timestamp === "bigint" ? Number(timestamp) : timestamp;
+  let ms: number;
+  if (typeof timestamp === "bigint") {
+    const raw = Number(timestamp);
+    ms = raw > 1e15 ? Math.floor(raw / 1_000_000) : raw;
+  } else {
+    ms = timestamp > 1e15 ? Math.floor(timestamp / 1_000_000) : timestamp;
+  }
   const d = new Date(ms);
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");

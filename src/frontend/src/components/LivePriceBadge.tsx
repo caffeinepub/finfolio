@@ -3,9 +3,7 @@ import { usePrices } from "@/contexts/PriceFeedContext";
 import { cn } from "@/lib/utils";
 
 const SOURCE_LABELS: Record<string, string> = {
-  coincap: "CoinCap",
   coingecko: "CoinGecko",
-  finnhub: "Finnhub",
   frankfurter: "Frankfurter",
   yahoo: "Yahoo Finance",
   manual: "Manual",

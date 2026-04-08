@@ -35,39 +35,59 @@ import {
   useDeleteTransaction,
   useGetAssets,
   useGetTransactions,
+  useUpdateTransaction,
 } from "@/hooks/useQueries";
 import {
   dateInputToTimestamp,
   formatDate,
   formatDateInput,
 } from "@/utils/formatters";
-import { ArrowLeftRight, Plus, Trash2 } from "lucide-react";
+import { ArrowLeftRight, Edit2, Plus, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 const TODAY = formatDateInput(Date.now());
 
+type TxFormState = {
+  txType: TxType;
+  date: string;
+  quantity: string;
+  price: string;
+  fee: string;
+  note: string;
+};
+
+const defaultForm: TxFormState = {
+  txType: TxType.Buy,
+  date: TODAY,
+  quantity: "",
+  price: "",
+  fee: "0",
+  note: "",
+};
+
 export default function TransactionsPage() {
   const { data: transactions, isLoading: txLoading } = useGetTransactions();
   const { data: assets } = useGetAssets();
   const addTransaction = useAddTransaction();
   const deleteTransaction = useDeleteTransaction();
+  const updateTransaction = useUpdateTransaction();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
   const [filterType, setFilterType] = useState<string>("All");
   const [filterAsset, setFilterAsset] = useState<string>("all");
 
-  const [form, setForm] = useState({
+  const [addForm, setAddForm] = useState<{ assetId: string } & TxFormState>({
     assetId: "",
-    txType: TxType.Buy as TxType,
-    date: TODAY,
-    quantity: "",
-    price: "",
-    fee: "0",
-    note: "",
+    ...defaultForm,
   });
+
+  // Edit state
+  const [editingTransaction, setEditingTransaction] =
+    useState<Transaction | null>(null);
+  const [editForm, setEditForm] = useState<TxFormState>(defaultForm);
 
   const assetMap = useMemo(() => {
     const m = new Map<string, string>();
@@ -90,7 +110,7 @@ export default function TransactionsPage() {
   }, [transactions, filterType, filterAsset]);
 
   const openAdd = () => {
-    setForm({
+    setAddForm({
       assetId: assets && assets.length > 0 ? assets[0].id.toString() : "",
       txType: TxType.Buy,
       date: TODAY,
@@ -102,9 +122,26 @@ export default function TransactionsPage() {
     setDialogOpen(true);
   };
 
+  const openEdit = (tx: Transaction) => {
+    setEditForm({
+      txType: tx.txType,
+      date: formatDateInput(Number(tx.date) / 1_000_000),
+      quantity: tx.quantity.toString(),
+      price: tx.price.toString(),
+      fee: tx.fee.toString(),
+      note: tx.note,
+    });
+    setEditingTransaction(tx);
+  };
+
+  const closeEdit = () => {
+    setEditingTransaction(null);
+    setEditForm(defaultForm);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.assetId) {
+    if (!addForm.assetId) {
       toast.error("Please select an asset");
       return;
     }
@@ -112,18 +149,40 @@ export default function TransactionsPage() {
       await addTransaction.mutateAsync({
         id: 0n,
         createdAt: BigInt(Date.now()),
-        assetId: BigInt(form.assetId),
-        txType: form.txType,
-        date: dateInputToTimestamp(form.date),
-        quantity: Number.parseFloat(form.quantity) || 0,
-        price: Number.parseFloat(form.price) || 0,
-        fee: Number.parseFloat(form.fee) || 0,
-        note: form.note,
+        assetId: BigInt(addForm.assetId),
+        txType: addForm.txType,
+        date: dateInputToTimestamp(addForm.date),
+        quantity: Number.parseFloat(addForm.quantity) || 0,
+        price: Number.parseFloat(addForm.price) || 0,
+        fee: Number.parseFloat(addForm.fee) || 0,
+        note: addForm.note,
       });
       toast.success("Transaction added");
       setDialogOpen(false);
     } catch {
       toast.error("Failed to add transaction");
+    }
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTransaction) return;
+    try {
+      await updateTransaction.mutateAsync({
+        id: editingTransaction.id,
+        assetId: editingTransaction.assetId,
+        createdAt: editingTransaction.createdAt,
+        txType: editForm.txType,
+        date: dateInputToTimestamp(editForm.date),
+        quantity: Number.parseFloat(editForm.quantity) || 0,
+        price: Number.parseFloat(editForm.price) || 0,
+        fee: Number.parseFloat(editForm.fee) || 0,
+        note: editForm.note,
+      });
+      toast.success("Transaction updated");
+      closeEdit();
+    } catch {
+      toast.error("Failed to update transaction");
     }
   };
 
@@ -307,15 +366,26 @@ export default function TransactionsPage() {
                         {tx.note || "—"}
                       </TableCell>
                       <TableCell className="text-right pr-5">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-fin-red"
-                          onClick={() => setDeleteTarget(tx)}
-                          data-ocid={`transactions.delete_button.${i + 1}`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-yellow-400 transition-colors"
+                            onClick={() => openEdit(tx)}
+                            data-ocid={`transactions.edit_button.${i + 1}`}
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-fin-red transition-colors"
+                            onClick={() => setDeleteTarget(tx)}
+                            data-ocid={`transactions.delete_button.${i + 1}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -342,9 +412,9 @@ export default function TransactionsPage() {
               <div>
                 <Label className="text-foreground text-sm">Asset *</Label>
                 <select
-                  value={form.assetId}
+                  value={addForm.assetId}
                   onChange={(e) =>
-                    setForm((p) => ({ ...p, assetId: e.target.value }))
+                    setAddForm((p) => ({ ...p, assetId: e.target.value }))
                   }
                   className="mt-1 w-full h-10 px-3 rounded-md bg-muted border border-border text-foreground text-sm"
                   required
@@ -361,9 +431,12 @@ export default function TransactionsPage() {
               <div>
                 <Label className="text-foreground text-sm">Type *</Label>
                 <select
-                  value={form.txType}
+                  value={addForm.txType}
                   onChange={(e) =>
-                    setForm((p) => ({ ...p, txType: e.target.value as TxType }))
+                    setAddForm((p) => ({
+                      ...p,
+                      txType: e.target.value as TxType,
+                    }))
                   }
                   className="mt-1 w-full h-10 px-3 rounded-md bg-muted border border-border text-foreground text-sm"
                   data-ocid="transactions.type.select"
@@ -379,9 +452,9 @@ export default function TransactionsPage() {
               <Label className="text-foreground text-sm">Date *</Label>
               <Input
                 type="date"
-                value={form.date}
+                value={addForm.date}
                 onChange={(e) =>
-                  setForm((p) => ({ ...p, date: e.target.value }))
+                  setAddForm((p) => ({ ...p, date: e.target.value }))
                 }
                 className="mt-1 bg-muted border-border"
                 required
@@ -394,9 +467,9 @@ export default function TransactionsPage() {
                 <Input
                   type="number"
                   step="any"
-                  value={form.quantity}
+                  value={addForm.quantity}
                   onChange={(e) =>
-                    setForm((p) => ({ ...p, quantity: e.target.value }))
+                    setAddForm((p) => ({ ...p, quantity: e.target.value }))
                   }
                   placeholder="0.00"
                   className="mt-1 bg-muted border-border"
@@ -409,9 +482,9 @@ export default function TransactionsPage() {
                 <Input
                   type="number"
                   step="any"
-                  value={form.price}
+                  value={addForm.price}
                   onChange={(e) =>
-                    setForm((p) => ({ ...p, price: e.target.value }))
+                    setAddForm((p) => ({ ...p, price: e.target.value }))
                   }
                   placeholder="0.00"
                   className="mt-1 bg-muted border-border"
@@ -425,9 +498,9 @@ export default function TransactionsPage() {
               <Input
                 type="number"
                 step="any"
-                value={form.fee}
+                value={addForm.fee}
                 onChange={(e) =>
-                  setForm((p) => ({ ...p, fee: e.target.value }))
+                  setAddForm((p) => ({ ...p, fee: e.target.value }))
                 }
                 placeholder="0.00"
                 className="mt-1 bg-muted border-border"
@@ -437,9 +510,9 @@ export default function TransactionsPage() {
             <div>
               <Label className="text-foreground text-sm">Note</Label>
               <Input
-                value={form.note}
+                value={addForm.note}
                 onChange={(e) =>
-                  setForm((p) => ({ ...p, note: e.target.value }))
+                  setAddForm((p) => ({ ...p, note: e.target.value }))
                 }
                 placeholder="Optional note"
                 className="mt-1 bg-muted border-border"
@@ -463,6 +536,155 @@ export default function TransactionsPage() {
                 data-ocid="transactions.submit_button"
               >
                 {addTransaction.isPending ? "Adding..." : "Add Transaction"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog
+        open={!!editingTransaction}
+        onOpenChange={(o) => !o && closeEdit()}
+      >
+        <DialogContent
+          className="bg-card border-border max-w-md"
+          data-ocid="transactions.edit_dialog"
+        >
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <DialogTitle className="text-foreground">
+                Sửa giao dịch
+              </DialogTitle>
+              {editingTransaction && (
+                <TxTypeBadge txType={editingTransaction.txType} />
+              )}
+            </div>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            {/* Asset — read-only */}
+            <div>
+              <Label className="text-foreground text-sm">Asset</Label>
+              <div className="mt-1 w-full h-10 px-3 rounded-md bg-muted/50 border border-border text-muted-foreground text-sm flex items-center font-mono font-bold">
+                {editingTransaction
+                  ? (assetMap.get(editingTransaction.assetId.toString()) ?? "—")
+                  : "—"}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-foreground text-sm">Type *</Label>
+                <select
+                  value={editForm.txType}
+                  onChange={(e) =>
+                    setEditForm((p) => ({
+                      ...p,
+                      txType: e.target.value as TxType,
+                    }))
+                  }
+                  className="mt-1 w-full h-10 px-3 rounded-md bg-muted border border-border text-foreground text-sm focus:outline-none focus:border-fin-green/50"
+                  data-ocid="transactions.edit.type.select"
+                >
+                  <option value={TxType.Buy}>Buy</option>
+                  <option value={TxType.Sell}>Sell</option>
+                  <option value={TxType.Deposit}>Deposit</option>
+                  <option value={TxType.Withdraw}>Withdraw</option>
+                </select>
+              </div>
+              <div>
+                <Label className="text-foreground text-sm">Date *</Label>
+                <Input
+                  type="date"
+                  value={editForm.date}
+                  onChange={(e) =>
+                    setEditForm((p) => ({ ...p, date: e.target.value }))
+                  }
+                  className="mt-1 bg-muted border-border"
+                  required
+                  data-ocid="transactions.edit.date.input"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-foreground text-sm">Quantity *</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  value={editForm.quantity}
+                  onChange={(e) =>
+                    setEditForm((p) => ({ ...p, quantity: e.target.value }))
+                  }
+                  placeholder="0.00"
+                  className="mt-1 bg-muted border-border"
+                  required
+                  data-ocid="transactions.edit.quantity.input"
+                />
+              </div>
+              <div>
+                <Label className="text-foreground text-sm">Price *</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  value={editForm.price}
+                  onChange={(e) =>
+                    setEditForm((p) => ({ ...p, price: e.target.value }))
+                  }
+                  placeholder="0.00"
+                  className="mt-1 bg-muted border-border"
+                  required
+                  data-ocid="transactions.edit.price.input"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-foreground text-sm">Fee</Label>
+              <Input
+                type="number"
+                step="any"
+                value={editForm.fee}
+                onChange={(e) =>
+                  setEditForm((p) => ({ ...p, fee: e.target.value }))
+                }
+                placeholder="0.00"
+                className="mt-1 bg-muted border-border"
+                data-ocid="transactions.edit.fee.input"
+              />
+            </div>
+
+            <div>
+              <Label className="text-foreground text-sm">Note</Label>
+              <Input
+                value={editForm.note}
+                onChange={(e) =>
+                  setEditForm((p) => ({ ...p, note: e.target.value }))
+                }
+                placeholder="Optional note"
+                className="mt-1 bg-muted border-border"
+                data-ocid="transactions.edit.note.input"
+              />
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={closeEdit}
+                className="text-muted-foreground"
+                data-ocid="transactions.edit.cancel_button"
+              >
+                Hủy
+              </Button>
+              <Button
+                type="submit"
+                disabled={updateTransaction.isPending}
+                className="bg-fin-green text-background hover:bg-fin-green/90"
+                data-ocid="transactions.edit.submit_button"
+              >
+                {updateTransaction.isPending ? "Đang lưu..." : "Lưu thay đổi"}
               </Button>
             </DialogFooter>
           </form>

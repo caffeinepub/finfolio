@@ -7,6 +7,60 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
+export interface TransformationOutput {
+    status: bigint;
+    body: Uint8Array;
+    headers: Array<http_header>;
+}
+export interface PortfolioSummary {
+    totalValue: number;
+    totalCost: number;
+    dailyChange: number;
+    totalGainLoss: number;
+    allocation: Array<{
+        value: number;
+        category: Category;
+        percentage: number;
+    }>;
+    totalGainLossPercent: number;
+}
+export interface StockSearchResult {
+    name: string;
+    exchange: string;
+    symbol: string;
+}
+export interface Public {
+    baseCurrency: string;
+    displayName: string;
+    createdAt: bigint;
+    user: Principal;
+}
+export interface http_header {
+    value: string;
+    name: string;
+}
+export interface http_request_result {
+    status: bigint;
+    body: Uint8Array;
+    headers: Array<http_header>;
+}
+export interface Transaction {
+    id: bigint;
+    fee: number;
+    assetId: bigint;
+    date: bigint;
+    note: string;
+    createdAt: bigint;
+    quantity: number;
+    txType: TxType;
+    price: number;
+}
+export interface StockPrice {
+    ok: boolean;
+    change24h: number;
+    price: number;
+    symbol: string;
+}
 export interface Holding {
     currentPrice: number;
     assetId: bigint;
@@ -37,34 +91,9 @@ export interface Public__1 {
     manualPrice: number;
     symbol: string;
 }
-export interface PortfolioSummary {
-    totalValue: number;
-    totalCost: number;
-    dailyChange: number;
-    totalGainLoss: number;
-    allocation: Array<{
-        value: number;
-        category: Category;
-        percentage: number;
-    }>;
-    totalGainLossPercent: number;
-}
-export interface Public {
-    baseCurrency: string;
-    displayName: string;
-    createdAt: bigint;
-    user: Principal;
-}
-export interface Transaction {
-    id: bigint;
-    fee: number;
-    assetId: bigint;
-    date: bigint;
-    note: string;
-    createdAt: bigint;
-    quantity: number;
-    txType: TxType;
-    price: number;
+export interface TransformationInput {
+    context: Uint8Array;
+    response: http_request_result;
 }
 export enum Category {
     Stock = "Stock",
@@ -98,11 +127,15 @@ export interface backendInterface {
     getPortfolioSummary(): Promise<PortfolioSummary>;
     getProfile(): Promise<Public | null>;
     getSnapshots(startDate: bigint, endDate: bigint): Promise<Array<PortfolioSnapshot>>;
+    getStockPrice(symbol: string): Promise<StockPrice>;
     getTransaction(id: bigint): Promise<Transaction | null>;
     getTransactions(): Promise<Array<Transaction>>;
     getUserProfile(user: Principal): Promise<Public | null>;
     isCallerAdmin(): Promise<boolean>;
     saveCallerUserProfile(profile: Public): Promise<void>;
+    searchStocks(searchTerm: string): Promise<Array<StockSearchResult>>;
+    transform(input: TransformationInput): Promise<TransformationOutput>;
+    transformSearch(input: TransformationInput): Promise<TransformationOutput>;
     updateAsset(asset: Public__1): Promise<void>;
     updateProfile(profile: Public): Promise<void>;
     updateTransaction(tx: Transaction): Promise<void>;

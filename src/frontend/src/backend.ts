@@ -89,6 +89,60 @@ export class ExternalBlob {
         return this;
     }
 }
+export interface TransformationOutput {
+    status: bigint;
+    body: Uint8Array;
+    headers: Array<http_header>;
+}
+export interface PortfolioSummary {
+    totalValue: number;
+    totalCost: number;
+    dailyChange: number;
+    totalGainLoss: number;
+    allocation: Array<{
+        value: number;
+        category: Category;
+        percentage: number;
+    }>;
+    totalGainLossPercent: number;
+}
+export interface StockSearchResult {
+    name: string;
+    exchange: string;
+    symbol: string;
+}
+export interface Public {
+    baseCurrency: string;
+    displayName: string;
+    createdAt: bigint;
+    user: Principal;
+}
+export interface http_header {
+    value: string;
+    name: string;
+}
+export interface http_request_result {
+    status: bigint;
+    body: Uint8Array;
+    headers: Array<http_header>;
+}
+export interface Transaction {
+    id: bigint;
+    fee: number;
+    assetId: bigint;
+    date: bigint;
+    note: string;
+    createdAt: bigint;
+    quantity: number;
+    txType: TxType;
+    price: number;
+}
+export interface StockPrice {
+    ok: boolean;
+    change24h: number;
+    price: number;
+    symbol: string;
+}
 export interface Holding {
     currentPrice: number;
     assetId: bigint;
@@ -119,34 +173,9 @@ export interface Public__1 {
     manualPrice: number;
     symbol: string;
 }
-export interface PortfolioSummary {
-    totalValue: number;
-    totalCost: number;
-    dailyChange: number;
-    totalGainLoss: number;
-    allocation: Array<{
-        value: number;
-        category: Category;
-        percentage: number;
-    }>;
-    totalGainLossPercent: number;
-}
-export interface Public {
-    baseCurrency: string;
-    displayName: string;
-    createdAt: bigint;
-    user: Principal;
-}
-export interface Transaction {
-    id: bigint;
-    fee: number;
-    assetId: bigint;
-    date: bigint;
-    note: string;
-    createdAt: bigint;
-    quantity: number;
-    txType: TxType;
-    price: number;
+export interface TransformationInput {
+    context: Uint8Array;
+    response: http_request_result;
 }
 export enum Category {
     Stock = "Stock",
@@ -166,7 +195,7 @@ export enum UserRole {
     guest = "guest"
 }
 export interface backendInterface {
-    _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
+    _initializeAccessControl(): Promise<void>;
     addAsset(asset: Public__1): Promise<bigint>;
     addSnapshot(snapshot: PortfolioSnapshot): Promise<bigint>;
     addTransaction(tx: Transaction): Promise<bigint>;
@@ -181,11 +210,15 @@ export interface backendInterface {
     getPortfolioSummary(): Promise<PortfolioSummary>;
     getProfile(): Promise<Public | null>;
     getSnapshots(startDate: bigint, endDate: bigint): Promise<Array<PortfolioSnapshot>>;
+    getStockPrice(symbol: string): Promise<StockPrice>;
     getTransaction(id: bigint): Promise<Transaction | null>;
     getTransactions(): Promise<Array<Transaction>>;
     getUserProfile(user: Principal): Promise<Public | null>;
     isCallerAdmin(): Promise<boolean>;
     saveCallerUserProfile(profile: Public): Promise<void>;
+    searchStocks(searchTerm: string): Promise<Array<StockSearchResult>>;
+    transform(input: TransformationInput): Promise<TransformationOutput>;
+    transformSearch(input: TransformationInput): Promise<TransformationOutput>;
     updateAsset(asset: Public__1): Promise<void>;
     updateProfile(profile: Public): Promise<void>;
     updateTransaction(tx: Transaction): Promise<void>;
@@ -193,17 +226,17 @@ export interface backendInterface {
 import type { Category as _Category, Holding as _Holding, PortfolioSummary as _PortfolioSummary, Public as _Public, Public__1 as _Public__1, Transaction as _Transaction, TxType as _TxType, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
-    async _initializeAccessControlWithSecret(arg0: string): Promise<void> {
+    async _initializeAccessControl(): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor._initializeAccessControlWithSecret(arg0);
+                const result = await this.actor._initializeAccessControl();
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor._initializeAccessControlWithSecret(arg0);
+            const result = await this.actor._initializeAccessControl();
             return result;
         }
     }
@@ -403,6 +436,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async getStockPrice(arg0: string): Promise<StockPrice> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getStockPrice(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getStockPrice(arg0);
+            return result;
+        }
+    }
     async getTransaction(arg0: bigint): Promise<Transaction | null> {
         if (this.processError) {
             try {
@@ -470,6 +517,48 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.saveCallerUserProfile(arg0);
+            return result;
+        }
+    }
+    async searchStocks(arg0: string): Promise<Array<StockSearchResult>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.searchStocks(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.searchStocks(arg0);
+            return result;
+        }
+    }
+    async transform(arg0: TransformationInput): Promise<TransformationOutput> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.transform(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.transform(arg0);
+            return result;
+        }
+    }
+    async transformSearch(arg0: TransformationInput): Promise<TransformationOutput> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.transformSearch(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.transformSearch(arg0);
             return result;
         }
     }

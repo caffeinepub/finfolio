@@ -16,6 +16,7 @@ import { Loader2 } from "lucide-react";
 import { useState } from "react";
 
 function useGetCallerUserProfile() {
+  // Use actor from useActor() — this guarantees _initializeAccessControl has run
   const { actor, isFetching: actorFetching } = useActor();
 
   const query = useQuery<Public | null>({
@@ -25,10 +26,11 @@ function useGetCallerUserProfile() {
       try {
         return await actor.getCallerUserProfile();
       } catch {
-        // Backend may throw when user is not yet registered (race with access control init)
+        // Backend throws when user is not yet registered
         return null;
       }
     },
+    // Only run after actor is fully ready (not fetching = _initializeAccessControl is done)
     enabled: !!actor && !actorFetching,
     retry: false,
   });
@@ -36,7 +38,7 @@ function useGetCallerUserProfile() {
   return {
     ...query,
     isLoading: actorFetching || query.isLoading,
-    isFetched: !!actor && query.isFetched,
+    isFetched: !!actor && !actorFetching && query.isFetched,
   };
 }
 
@@ -60,7 +62,6 @@ function AuthenticatedApp() {
 
   const handleProfileComplete = () => {
     setProfileSetupDone(true);
-    // Invalidate profile queries so the app refreshes with the new profile
     queryClient.invalidateQueries({ queryKey: ["currentUserProfile"] });
     queryClient.invalidateQueries({ queryKey: ["profile"] });
   };
@@ -111,10 +112,11 @@ function AuthenticatedApp() {
 
 export default function App() {
   const { identity, isInitializing } = useInternetIdentity();
+  const { isFetching: actorFetching } = useActor();
   const isAuthenticated = !!identity;
 
-  // Show full-page loader while initializing
-  if (isInitializing) {
+  // Show full-page loader while identity is initializing OR actor is being set up
+  if (isInitializing || (isAuthenticated && actorFetching)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">

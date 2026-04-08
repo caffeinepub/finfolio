@@ -32,7 +32,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { usePrices } from "@/contexts/PriceFeedContext";
 import {
   useAddAsset,
   useDeleteAsset,
@@ -53,22 +52,13 @@ const EMPTY_ASSET: Omit<Public__1, "id" | "createdAt"> = {
   note: "",
 };
 
-function isVNStock(symbol: string): boolean {
-  return (
-    symbol.endsWith(".VN") ||
-    symbol.startsWith("HOSE:") ||
-    symbol.startsWith("HNX:")
-  );
-}
-
 /**
  * Determine if manual price input should be shown.
- * VN stocks (symbol ends with .VN) always have live price from Yahoo Finance -- no key needed.
+ * All stocks now use Yahoo Finance via backend -- no API key required.
  */
 function getPriceFieldConfig(
   category: Category,
-  hasFinnhubKey: boolean,
-  symbol: string,
+  _symbol: string,
 ): {
   show: boolean;
   label: string;
@@ -87,32 +77,13 @@ function getPriceFieldConfig(
         liveSource: category === Category.Crypto ? "CoinGecko" : "Frankfurter",
       };
     case Category.Stock:
-      if (isVNStock(symbol)) {
-        // VN stocks always have live price via Yahoo Finance
-        return {
-          show: false,
-          label: "",
-          helper: "",
-          placeholder: "",
-          liveSource: "Yahoo Finance",
-        };
-      }
-      if (hasFinnhubKey) {
-        return {
-          show: false,
-          label: "",
-          helper: "",
-          placeholder: "",
-          liveSource: "Finnhub",
-        };
-      }
+      // All stocks (VN and international) use Yahoo Finance via backend proxy
       return {
-        show: true,
-        label: "Fallback Price",
-        helper:
-          "Used when Finnhub API key is not configured. Set your key in Settings > Price Data to get live stock prices.",
-        placeholder: "0.00",
-        liveSource: "",
+        show: false,
+        label: "",
+        helper: "",
+        placeholder: "",
+        liveSource: "Yahoo Finance",
       };
     case Category.Cash:
       return {
@@ -151,15 +122,11 @@ export default function AssetsPage() {
   const addAsset = useAddAsset();
   const updateAsset = useUpdateAsset();
   const deleteAsset = useDeleteAsset();
-  const { hasFinnhubKey } = usePrices();
-
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Public__1 | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Public__1 | null>(null);
   const [form, setForm] =
     useState<Omit<Public__1, "id" | "createdAt">>(EMPTY_ASSET);
-
-  const finnhubKey = localStorage.getItem("finnhub_key") ?? "";
 
   const openAdd = () => {
     setEditTarget(null);
@@ -224,11 +191,7 @@ export default function AssetsPage() {
   const isPending = addAsset.isPending || updateAsset.isPending;
 
   // Reactive: derive price field config from current form category + symbol
-  const priceFieldConfig = getPriceFieldConfig(
-    form.category,
-    hasFinnhubKey,
-    form.symbol,
-  );
+  const priceFieldConfig = getPriceFieldConfig(form.category, form.symbol);
 
   // Display symbol nicely (strip .VN suffix for UI)
   function displaySymbol(symbol: string): string {
@@ -466,7 +429,6 @@ export default function AssetsPage() {
                 <div className="mt-1">
                   <AssetSearchInput
                     category={form.category}
-                    finnhubKey={finnhubKey}
                     onSelect={(result) =>
                       setForm((p) => ({
                         ...p,

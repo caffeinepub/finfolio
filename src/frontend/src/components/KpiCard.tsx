@@ -76,7 +76,7 @@ export default function KpiCard({
             </div>
           )}
 
-          {subtitle && !delta && (
+          {subtitle && delta === undefined && (
             <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
           )}
         </div>

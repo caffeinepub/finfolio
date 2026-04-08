@@ -1,0 +1,152 @@
+type http_request_result = 
+ record {
+   body: blob;
+   headers: vec http_header;
+   status: nat;
+ };
+type http_header = 
+ record {
+   name: text;
+   value: text;
+ };
+type UserRole = 
+ variant {
+   admin;
+   guest;
+   user;
+ };
+type TxType = 
+ variant {
+   Buy;
+   Deposit;
+   Sell;
+   Withdraw;
+ };
+type TransformationOutput = 
+ record {
+   body: blob;
+   headers: vec http_header;
+   status: nat;
+ };
+type TransformationInput = 
+ record {
+   context: blob;
+   response: http_request_result;
+ };
+type Transaction = 
+ record {
+   assetId: nat;
+   createdAt: int;
+   date: int;
+   fee: float64;
+   id: nat;
+   note: text;
+   price: float64;
+   quantity: float64;
+   txType: TxType;
+ };
+type StockSearchResult = 
+ record {
+   exchange: text;
+   name: text;
+   symbol: text;
+ };
+type StockPrice = 
+ record {
+   change24h: float64;
+   ok: bool;
+   price: float64;
+   symbol: text;
+ };
+type Public__1 = 
+ record {
+   category: Category;
+   createdAt: int;
+   currency: text;
+   id: nat;
+   manualPrice: float64;
+   name: text;
+   note: text;
+   symbol: text;
+ };
+type Public = 
+ record {
+   baseCurrency: text;
+   createdAt: int;
+   displayName: text;
+   user: principal;
+ };
+type PortfolioSummary = 
+ record {
+   allocation:
+    vec record {
+          category: Category;
+          percentage: float64;
+          value: float64;
+        };
+   dailyChange: float64;
+   totalCost: float64;
+   totalGainLoss: float64;
+   totalGainLossPercent: float64;
+   totalValue: float64;
+ };
+type PortfolioSnapshot = 
+ record {
+   createdAt: int;
+   date: int;
+   id: nat;
+   totalValue: float64;
+ };
+type Holding = 
+ record {
+   assetId: nat;
+   averageCost: float64;
+   category: Category;
+   currency: text;
+   currentPrice: float64;
+   gainLoss: float64;
+   gainLossPercent: float64;
+   name: text;
+   quantity: float64;
+   symbol: text;
+   totalCost: float64;
+   totalValue: float64;
+ };
+type Category = 
+ variant {
+   Cash;
+   Crypto;
+   Forex;
+   Stock;
+ };
+service : {
+  _initializeAccessControl: () -> ();
+  addAsset: (asset: Public__1) -> (nat);
+  addSnapshot: (snapshot: PortfolioSnapshot) -> (nat);
+  addTransaction: (tx: Transaction) -> (nat);
+  assignCallerUserRole: (user: principal, role: UserRole) -> ();
+  deleteAsset: (id: nat) -> ();
+  deleteTransaction: (id: nat) -> ();
+  getAsset: (id: nat) -> (opt Public__1) query;
+  getAssets: () -> (vec Public__1) query;
+  getCallerUserProfile: () -> (opt Public) query;
+  getCallerUserRole: () -> (UserRole) query;
+  getHoldings: () -> (vec Holding) query;
+  getPortfolioSummary: () -> (PortfolioSummary) query;
+  getProfile: () -> (opt Public) query;
+  getSnapshots: (startDate: int, endDate: int) ->
+   (vec PortfolioSnapshot) query;
+  getStockPrice: (symbol: text) -> (StockPrice);
+  getTransaction: (id: nat) -> (opt Transaction) query;
+  getTransactions: () -> (vec Transaction) query;
+  getUserProfile: (user: principal) -> (opt Public) query;
+  isCallerAdmin: () -> (bool) query;
+  saveCallerUserProfile: (profile: Public) -> ();
+  searchStocks: (searchTerm: text) -> (vec StockSearchResult);
+  transform: (input: TransformationInput) -> (TransformationOutput) query;
+  transformSearch: (input: TransformationInput) ->
+   (TransformationOutput) query;
+  updateAsset: (asset: Public__1) -> ();
+  updateProfile: (profile: Public) -> ();
+  updateTransaction: (tx: Transaction) -> ();
+}

@@ -1,5 +1,7 @@
 import { Category } from "@/backend.d";
 import { Input } from "@/components/ui/input";
+import { getActorFromCache } from "@/hooks/useQueries";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -9,179 +11,18 @@ interface SearchResult {
   displaySymbol?: string; // shown in UI (e.g. 'BTC', 'VNM')
   price?: number;
   exchange?: string; // e.g. 'HOSE', 'HNX', 'NASDAQ'
+  isCustom?: boolean; // user-entered symbol not in static list
 }
 
 interface AssetSearchInputProps {
   category: Category;
-  finnhubKey: string;
   onSelect: (result: { symbol: string; name: string }) => void;
   selectedSymbol?: string;
   selectedName?: string;
   onClear: () => void;
 }
 
-// Popular global stocks (fallback when no Finnhub key)
-const POPULAR_STOCKS: SearchResult[] = [
-  { symbol: "AAPL", name: "Apple Inc.", exchange: "NASDAQ" },
-  { symbol: "MSFT", name: "Microsoft Corp.", exchange: "NASDAQ" },
-  { symbol: "GOOGL", name: "Alphabet Inc.", exchange: "NASDAQ" },
-  { symbol: "AMZN", name: "Amazon.com Inc.", exchange: "NASDAQ" },
-  { symbol: "TSLA", name: "Tesla Inc.", exchange: "NASDAQ" },
-  { symbol: "META", name: "Meta Platforms", exchange: "NASDAQ" },
-  { symbol: "NVDA", name: "NVIDIA Corp.", exchange: "NASDAQ" },
-  { symbol: "JPM", name: "JPMorgan Chase", exchange: "NYSE" },
-  { symbol: "V", name: "Visa Inc.", exchange: "NYSE" },
-  { symbol: "BRK.B", name: "Berkshire Hathaway", exchange: "NYSE" },
-  { symbol: "JNJ", name: "Johnson & Johnson", exchange: "NYSE" },
-  { symbol: "WMT", name: "Walmart Inc.", exchange: "NYSE" },
-];
-
-// Vietnamese stocks using Yahoo Finance symbol format ({TICKER}.VN)
-// Yahoo Finance uses .VN suffix for all Vietnamese stocks (both HOSE and HNX)
-const VN_STOCKS: SearchResult[] = [
-  {
-    symbol: "VNM.VN",
-    name: "Vinamilk",
-    displaySymbol: "VNM",
-    exchange: "HOSE",
-  },
-  {
-    symbol: "VIC.VN",
-    name: "Vingroup",
-    displaySymbol: "VIC",
-    exchange: "HOSE",
-  },
-  {
-    symbol: "VHM.VN",
-    name: "Vinhomes",
-    displaySymbol: "VHM",
-    exchange: "HOSE",
-  },
-  {
-    symbol: "HPG.VN",
-    name: "Hoa Phat Group",
-    displaySymbol: "HPG",
-    exchange: "HOSE",
-  },
-  {
-    symbol: "FPT.VN",
-    name: "FPT Corporation",
-    displaySymbol: "FPT",
-    exchange: "HOSE",
-  },
-  {
-    symbol: "MWG.VN",
-    name: "Mobile World (The Gioi Di Dong)",
-    displaySymbol: "MWG",
-    exchange: "HOSE",
-  },
-  {
-    symbol: "TCB.VN",
-    name: "Techcombank",
-    displaySymbol: "TCB",
-    exchange: "HOSE",
-  },
-  {
-    symbol: "VCB.VN",
-    name: "Vietcombank",
-    displaySymbol: "VCB",
-    exchange: "HOSE",
-  },
-  { symbol: "BID.VN", name: "BIDV", displaySymbol: "BID", exchange: "HOSE" },
-  {
-    symbol: "CTG.VN",
-    name: "VietinBank",
-    displaySymbol: "CTG",
-    exchange: "HOSE",
-  },
-  { symbol: "MBB.VN", name: "MB Bank", displaySymbol: "MBB", exchange: "HOSE" },
-  {
-    symbol: "ACB.VN",
-    name: "Asia Commercial Bank",
-    displaySymbol: "ACB",
-    exchange: "HOSE",
-  },
-  { symbol: "VPB.VN", name: "VPBank", displaySymbol: "VPB", exchange: "HOSE" },
-  {
-    symbol: "STB.VN",
-    name: "Sacombank",
-    displaySymbol: "STB",
-    exchange: "HOSE",
-  },
-  {
-    symbol: "GAS.VN",
-    name: "PetroVietnam Gas",
-    displaySymbol: "GAS",
-    exchange: "HOSE",
-  },
-  {
-    symbol: "PLX.VN",
-    name: "Petrolimex",
-    displaySymbol: "PLX",
-    exchange: "HOSE",
-  },
-  {
-    symbol: "POW.VN",
-    name: "PetroVietnam Power",
-    displaySymbol: "POW",
-    exchange: "HOSE",
-  },
-  {
-    symbol: "MSN.VN",
-    name: "Masan Group",
-    displaySymbol: "MSN",
-    exchange: "HOSE",
-  },
-  { symbol: "SAB.VN", name: "Sabeco", displaySymbol: "SAB", exchange: "HOSE" },
-  {
-    symbol: "REE.VN",
-    name: "REE Corporation",
-    displaySymbol: "REE",
-    exchange: "HOSE",
-  },
-  {
-    symbol: "DXG.VN",
-    name: "Dat Xanh Group",
-    displaySymbol: "DXG",
-    exchange: "HOSE",
-  },
-  {
-    symbol: "NVL.VN",
-    name: "Novaland",
-    displaySymbol: "NVL",
-    exchange: "HOSE",
-  },
-  {
-    symbol: "PDR.VN",
-    name: "Phat Dat Real Estate",
-    displaySymbol: "PDR",
-    exchange: "HOSE",
-  },
-  { symbol: "SHB.VN", name: "SHB Bank", displaySymbol: "SHB", exchange: "HNX" },
-  {
-    symbol: "PVS.VN",
-    name: "PetroVietnam Technical Services",
-    displaySymbol: "PVS",
-    exchange: "HNX",
-  },
-  {
-    symbol: "VGS.VN",
-    name: "Viet General Steel",
-    displaySymbol: "VGS",
-    exchange: "HNX",
-  },
-  {
-    symbol: "CEO.VN",
-    name: "C.E.O Group",
-    displaySymbol: "CEO",
-    exchange: "HNX",
-  },
-];
-
-// Combined default stock list (VN first, then global)
-const ALL_POPULAR_STOCKS: SearchResult[] = [...VN_STOCKS, ...POPULAR_STOCKS];
-
-// Static forex list
+// Static forex list (Frankfurter has no search endpoint)
 const FOREX_LIST: SearchResult[] = [
   { symbol: "EUR", name: "Euro" },
   { symbol: "GBP", name: "British Pound" },
@@ -199,6 +40,15 @@ const FOREX_LIST: SearchResult[] = [
   { symbol: "MXN", name: "Mexican Peso" },
   { symbol: "BRL", name: "Brazilian Real" },
 ];
+
+function filterForex(query: string): SearchResult[] {
+  if (!query.trim()) return FOREX_LIST;
+  const q = query.toLowerCase();
+  return FOREX_LIST.filter(
+    (s) =>
+      s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q),
+  );
+}
 
 // CoinGecko search - free, no key required
 async function searchCrypto(query: string): Promise<SearchResult[]> {
@@ -248,93 +98,6 @@ async function searchCrypto(query: string): Promise<SearchResult[]> {
   }
 }
 
-async function searchStocks(
-  query: string,
-  finnhubKey: string,
-): Promise<{ results: SearchResult[]; usedKey: boolean }> {
-  const q = query.toLowerCase().trim();
-
-  if (!finnhubKey.trim()) {
-    // Filter static list (VN + global) — no Finnhub key needed for VN stocks
-    const filtered = ALL_POPULAR_STOCKS.filter(
-      (s) =>
-        s.symbol.toLowerCase().includes(q) ||
-        s.name.toLowerCase().includes(q) ||
-        // Allow search by ticker without .VN suffix (e.g. "VNM" matches "VNM.VN")
-        (s.displaySymbol ?? s.symbol)
-          .toLowerCase()
-          .includes(q),
-    ).slice(0, 10);
-    return {
-      results: filtered.length > 0 ? filtered : ALL_POPULAR_STOCKS.slice(0, 10),
-      usedKey: false,
-    };
-  }
-
-  if (!q) {
-    return { results: ALL_POPULAR_STOCKS.slice(0, 10), usedKey: true };
-  }
-
-  try {
-    const res = await fetch(
-      `https://finnhub.io/api/v1/search?q=${encodeURIComponent(query)}&token=${encodeURIComponent(finnhubKey)}`,
-      { signal: AbortSignal.timeout(8000) },
-    );
-    if (!res.ok) return { results: [], usedKey: true };
-    const json = await res.json();
-    if (!Array.isArray(json?.result)) return { results: [], usedKey: true };
-    const results = json.result
-      .filter(
-        (item: { type: string; exchange?: string }) =>
-          item.type === "Common Stock" ||
-          item.type === "EQS" ||
-          item.exchange === "HOSE" ||
-          item.exchange === "HNX",
-      )
-      .slice(0, 10)
-      .map(
-        (item: {
-          symbol: string;
-          description: string;
-          exchange?: string;
-          displaySymbol?: string;
-        }) => {
-          // Convert Finnhub VN symbols (HOSE:VNM) to Yahoo Finance format (VNM.VN)
-          let symbol = item.symbol;
-          let displaySymbol =
-            item.displaySymbol ?? item.symbol.split(":").pop();
-          if (
-            item.exchange === "HOSE" ||
-            item.exchange === "HNX" ||
-            item.symbol.includes(":")
-          ) {
-            const ticker = item.symbol.split(":").pop() ?? item.symbol;
-            symbol = `${ticker}.VN`;
-            displaySymbol = ticker;
-          }
-          return {
-            symbol,
-            name: item.description,
-            exchange: item.exchange,
-            displaySymbol,
-          };
-        },
-      );
-    return { results, usedKey: true };
-  } catch {
-    return { results: [], usedKey: true };
-  }
-}
-
-function filterForex(query: string): SearchResult[] {
-  if (!query.trim()) return FOREX_LIST;
-  const q = query.toLowerCase();
-  return FOREX_LIST.filter(
-    (s) =>
-      s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q),
-  );
-}
-
 function formatPrice(price: number): string {
   if (price >= 1000)
     return `$${price.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
@@ -343,9 +106,29 @@ function formatPrice(price: number): string {
   return `$${price.toFixed(6)}`;
 }
 
+/**
+ * Map Yahoo Finance exchange codes to human-readable names
+ */
+function mapExchange(exchangeCode: string): string {
+  const map: Record<string, string> = {
+    NMS: "NASDAQ",
+    NYQ: "NYSE",
+    NGM: "NASDAQ",
+    PCX: "NYSE Arca",
+    HNX: "HNX",
+    HSX: "HOSE",
+    VNM: "HOSE",
+    TKS: "TSE",
+    FRA: "FSE",
+    LSE: "LSE",
+    ASX: "ASX",
+    TSX: "TSX",
+  };
+  return map[exchangeCode] ?? exchangeCode;
+}
+
 export function AssetSearchInput({
   category,
-  finnhubKey,
   onSelect,
   selectedSymbol,
   selectedName,
@@ -355,9 +138,10 @@ export function AssetSearchInput({
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [noKeyNote, setNoKeyNote] = useState(false);
+  const [stockSearchError, setStockSearchError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -381,6 +165,7 @@ export function AssetSearchInput({
 
   const triggerSearch = (q: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    setStockSearchError(null);
 
     if (category === Category.Forex) {
       setResults(filterForex(q));
@@ -388,56 +173,76 @@ export function AssetSearchInput({
       return;
     }
 
-    if (category === Category.Stock && !finnhubKey && !q.trim()) {
-      setResults(ALL_POPULAR_STOCKS.slice(0, 10));
-      setNoKeyNote(false); // VN stocks don't need Finnhub key
-      setDropdownOpen(true);
-      return;
-    }
-
-    if (category === Category.Crypto && !q.trim()) {
-      setIsSearching(true);
-      searchCrypto("").then((res) => {
-        setResults(res);
-        setDropdownOpen(true);
-        setIsSearching(false);
-      });
-      return;
-    }
-
-    if (!q.trim()) {
-      if (category === Category.Stock) {
-        setResults(ALL_POPULAR_STOCKS.slice(0, 10));
-        setNoKeyNote(false);
-        setDropdownOpen(true);
-      } else {
-        setResults([]);
-        setDropdownOpen(false);
+    if (category === Category.Crypto) {
+      if (!q.trim()) {
+        setIsSearching(true);
+        searchCrypto("").then((res) => {
+          setResults(res);
+          setDropdownOpen(true);
+          setIsSearching(false);
+        });
+        return;
       }
-      return;
-    }
-
-    debounceRef.current = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        if (category === Category.Crypto) {
+      debounceRef.current = setTimeout(async () => {
+        setIsSearching(true);
+        try {
           const res = await searchCrypto(q);
           setResults(res);
           setDropdownOpen(true);
-        } else if (category === Category.Stock) {
-          const { results: res, usedKey } = await searchStocks(q, finnhubKey);
-          setResults(res);
-          setNoKeyNote(
-            !usedKey &&
-              res.length > 0 &&
-              res.some((r) => !r.symbol.endsWith(".VN")),
-          );
-          setDropdownOpen(true);
+        } finally {
+          setIsSearching(false);
         }
-      } finally {
-        setIsSearching(false);
+      }, 400);
+      return;
+    }
+
+    if (category === Category.Stock) {
+      // Require at least 1 char to trigger stock search
+      if (!q.trim()) {
+        setResults([]);
+        setDropdownOpen(false);
+        return;
       }
-    }, 400);
+
+      // Debounce: min 2 chars for stock search to avoid excessive calls
+      if (q.trim().length < 2) {
+        setResults([]);
+        setDropdownOpen(true);
+        return;
+      }
+
+      debounceRef.current = setTimeout(async () => {
+        setIsSearching(true);
+        setStockSearchError(null);
+        try {
+          const actor = getActorFromCache(queryClient);
+          if (!actor) {
+            setStockSearchError("Not connected — please wait and try again");
+            setResults([]);
+            setDropdownOpen(true);
+            return;
+          }
+          const backendResults = await actor.searchStocks(q.trim());
+          const mapped: SearchResult[] = backendResults.map((r) => ({
+            symbol: r.symbol,
+            name: r.name,
+            displaySymbol: r.symbol.includes(".")
+              ? r.symbol.split(".")[0]
+              : r.symbol,
+            exchange: r.exchange ? mapExchange(r.exchange) : undefined,
+          }));
+          setResults(mapped);
+          setDropdownOpen(true);
+        } catch {
+          setStockSearchError("Search failed — check your connection");
+          setResults([]);
+          setDropdownOpen(true);
+        } finally {
+          setIsSearching(false);
+        }
+      }, 500);
+      return;
+    }
   };
 
   const handleQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -451,7 +256,24 @@ export function AssetSearchInput({
     setDropdownOpen(false);
     setQuery("");
     setResults([]);
+    setStockSearchError(null);
   };
+
+  const showDropdown = dropdownOpen && results.length > 0;
+  const showNoResults =
+    dropdownOpen &&
+    results.length === 0 &&
+    query.trim().length >= 2 &&
+    !isSearching &&
+    !stockSearchError &&
+    category === Category.Stock;
+  const showError = dropdownOpen && !!stockSearchError && !isSearching;
+  const showHint =
+    dropdownOpen &&
+    results.length === 0 &&
+    query.trim().length === 1 &&
+    !isSearching &&
+    category === Category.Stock;
 
   // If asset already selected, show badge mode
   if (selectedSymbol) {
@@ -462,8 +284,8 @@ export function AssetSearchInput({
       >
         <div className="flex flex-col flex-1 min-w-0">
           <span className="text-xs font-bold font-mono text-fin-green">
-            {selectedSymbol.endsWith(".VN")
-              ? selectedSymbol.replace(".VN", "")
+            {selectedSymbol.includes(".")
+              ? selectedSymbol.split(".")[0]
               : selectedSymbol.includes(":")
                 ? selectedSymbol.split(":").pop()!.toUpperCase()
                 : selectedSymbol.toUpperCase()}
@@ -485,6 +307,13 @@ export function AssetSearchInput({
     );
   }
 
+  const placeholder =
+    category === Category.Stock
+      ? "Gõ tên hoặc mã cổ phiếu (AAPL, VNM, TSLA...)..."
+      : category === Category.Crypto
+        ? "Tìm theo tên hoặc mã (bitcoin, BTC, ETH...)..."
+        : "Tìm đơn vị tiền tệ (USD, EUR, VND...)...";
+
   return (
     <div ref={containerRef} className="relative">
       <div className="relative">
@@ -492,7 +321,7 @@ export function AssetSearchInput({
           value={query}
           onChange={handleQueryChange}
           onFocus={handleFocus}
-          placeholder="Search by name or symbol (e.g. VNM, FPT, AAPL)..."
+          placeholder={placeholder}
           className="bg-muted border-border pr-8"
           autoComplete="off"
           data-ocid="assets.search.input"
@@ -502,16 +331,27 @@ export function AssetSearchInput({
         )}
       </div>
 
-      {dropdownOpen && results.length > 0 && (
+      {/* Hint: type more chars */}
+      {showHint && (
+        <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-lg shadow-lg">
+          <p className="px-3 py-3 text-xs text-muted-foreground text-center">
+            Nhập ít nhất 2 ký tự để tìm kiếm...
+          </p>
+        </div>
+      )}
+
+      {/* Error state */}
+      {showError && (
+        <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-lg shadow-lg">
+          <p className="px-3 py-3 text-xs text-red-400 text-center">
+            {stockSearchError}
+          </p>
+        </div>
+      )}
+
+      {/* Results dropdown */}
+      {showDropdown && (
         <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden">
-          {noKeyNote && (
-            <div className="px-3 py-1.5 border-b border-border bg-muted/50">
-              <p className="text-[11px] text-muted-foreground">
-                Danh sách phổ biến — Cài Finnhub key trong Settings để tìm kiếm
-                cổ phiếu quốc tế đầy đủ hơn
-              </p>
-            </div>
-          )}
           <ul className="max-h-64 overflow-y-auto">
             {results.map((result) => (
               <li key={result.symbol}>
@@ -522,12 +362,7 @@ export function AssetSearchInput({
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span className="text-xs font-bold font-mono text-fin-green shrink-0">
-                      {result.displaySymbol ??
-                        (result.symbol.endsWith(".VN")
-                          ? result.symbol.replace(".VN", "")
-                          : result.symbol.includes(":")
-                            ? result.symbol.split(":").pop()!.toUpperCase()
-                            : result.symbol.toUpperCase())}
+                      {result.displaySymbol ?? result.symbol.toUpperCase()}
                     </span>
                     <div className="flex flex-col min-w-0">
                       <span className="text-xs text-muted-foreground truncate group-hover:text-foreground transition-colors">
@@ -552,7 +387,8 @@ export function AssetSearchInput({
         </div>
       )}
 
-      {dropdownOpen && results.length === 0 && query.trim() && !isSearching && (
+      {/* No results */}
+      {showNoResults && (
         <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-lg shadow-lg">
           <p className="px-3 py-3 text-xs text-muted-foreground text-center">
             Không tìm thấy kết quả cho &ldquo;{query}&rdquo;

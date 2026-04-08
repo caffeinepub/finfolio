@@ -1,5 +1,10 @@
 import type { backendInterface } from "@/backend";
-import type { Public, Public__1, Transaction } from "@/backend.d";
+import type {
+  PortfolioSnapshot,
+  Public,
+  Public__1,
+  Transaction,
+} from "@/backend.d";
 import { useActor } from "@/hooks/useActor";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -81,36 +86,21 @@ export function useGetProfile() {
 }
 
 /**
- * Get the best available actor from queryClient cache.
- * Prefers authenticated actors (non-anonymous principal) over anonymous ones.
+ * Exported only for legacy compatibility — prefer useActor() directly in mutations.
+ * @deprecated Use useActor() inside your hook instead.
  */
-function getActorFromCache(
-  qc: ReturnType<typeof useQueryClient>,
+export function getActorFromCache(
+  _qc: ReturnType<typeof useQueryClient>,
 ): backendInterface | null {
-  const queries = qc.getQueriesData<backendInterface>({ queryKey: ["actor"] });
-  // Prefer actor associated with a real principal (not "undefined" or "2vxsx-fae" anonymous)
-  let bestActor: backendInterface | null = null;
-  for (const [queryKey, data] of queries) {
-    if (!data) continue;
-    const principal = queryKey[1] as string | undefined;
-    // Skip anonymous/undefined actors if we have a better option
-    if (
-      principal &&
-      principal !== "undefined" &&
-      principal !== "2vxsx-fae" // anonymous principal
-    ) {
-      return data; // authenticated actor found -- use immediately
-    }
-    bestActor = data; // fallback to whatever we have
-  }
-  return bestActor;
+  // This function is no longer used — mutations now call useActor() directly.
+  return null;
 }
 
 export function useAddAsset() {
+  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (asset: Public__1) => {
-      const actor = getActorFromCache(qc);
       if (!actor) throw new Error("Not connected");
       return actor.addAsset(asset);
     },
@@ -123,10 +113,10 @@ export function useAddAsset() {
 }
 
 export function useUpdateAsset() {
+  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (asset: Public__1) => {
-      const actor = getActorFromCache(qc);
       if (!actor) throw new Error("Not connected");
       return actor.updateAsset(asset);
     },
@@ -139,10 +129,10 @@ export function useUpdateAsset() {
 }
 
 export function useDeleteAsset() {
+  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: bigint) => {
-      const actor = getActorFromCache(qc);
       if (!actor) throw new Error("Not connected");
       return actor.deleteAsset(id);
     },
@@ -156,10 +146,10 @@ export function useDeleteAsset() {
 }
 
 export function useAddTransaction() {
+  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (tx: Transaction) => {
-      const actor = getActorFromCache(qc);
       if (!actor) throw new Error("Not connected");
       return actor.addTransaction(tx);
     },
@@ -172,10 +162,10 @@ export function useAddTransaction() {
 }
 
 export function useUpdateTransaction() {
+  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (tx: Transaction) => {
-      const actor = getActorFromCache(qc);
       if (!actor) throw new Error("Not connected");
       return actor.updateTransaction(tx);
     },
@@ -188,10 +178,10 @@ export function useUpdateTransaction() {
 }
 
 export function useDeleteTransaction() {
+  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: bigint) => {
-      const actor = getActorFromCache(qc);
       if (!actor) throw new Error("Not connected");
       return actor.deleteTransaction(id);
     },
@@ -204,16 +194,30 @@ export function useDeleteTransaction() {
 }
 
 export function useUpdateProfile() {
+  const { actor } = useActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (profile: Public) => {
-      const actor = getActorFromCache(qc);
       if (!actor) throw new Error("Not connected");
       return actor.saveCallerUserProfile(profile);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["profile"] });
       qc.invalidateQueries({ queryKey: ["currentUserProfile"] });
+    },
+  });
+}
+
+export function useAddSnapshot() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (snapshot: PortfolioSnapshot) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.addSnapshot(snapshot);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["snapshots"] });
     },
   });
 }

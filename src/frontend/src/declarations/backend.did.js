@@ -86,9 +86,38 @@ export const PortfolioSummary = IDL.Record({
   ),
   'totalGainLossPercent' : IDL.Float64,
 });
+export const StockPrice = IDL.Record({
+  'ok' : IDL.Bool,
+  'change24h' : IDL.Float64,
+  'price' : IDL.Float64,
+  'symbol' : IDL.Text,
+});
+export const StockSearchResult = IDL.Record({
+  'name' : IDL.Text,
+  'exchange' : IDL.Text,
+  'symbol' : IDL.Text,
+});
+export const http_header = IDL.Record({
+  'value' : IDL.Text,
+  'name' : IDL.Text,
+});
+export const http_request_result = IDL.Record({
+  'status' : IDL.Nat,
+  'body' : IDL.Vec(IDL.Nat8),
+  'headers' : IDL.Vec(http_header),
+});
+export const TransformationInput = IDL.Record({
+  'context' : IDL.Vec(IDL.Nat8),
+  'response' : http_request_result,
+});
+export const TransformationOutput = IDL.Record({
+  'status' : IDL.Nat,
+  'body' : IDL.Vec(IDL.Nat8),
+  'headers' : IDL.Vec(http_header),
+});
 
 export const idlService = IDL.Service({
-  '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  '_initializeAccessControl' : IDL.Func([], [], []),
   'addAsset' : IDL.Func([Public__1], [IDL.Nat], []),
   'addSnapshot' : IDL.Func([PortfolioSnapshot], [IDL.Nat], []),
   'addTransaction' : IDL.Func([Transaction], [IDL.Nat], []),
@@ -100,18 +129,30 @@ export const idlService = IDL.Service({
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(Public)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getHoldings' : IDL.Func([], [IDL.Vec(Holding)], ['query']),
-  'getPortfolioSummary' : IDL.Func([], [PortfolioSummary], []),
+  'getPortfolioSummary' : IDL.Func([], [PortfolioSummary], ['query']),
   'getProfile' : IDL.Func([], [IDL.Opt(Public)], ['query']),
   'getSnapshots' : IDL.Func(
       [IDL.Int, IDL.Int],
       [IDL.Vec(PortfolioSnapshot)],
       ['query'],
     ),
+  'getStockPrice' : IDL.Func([IDL.Text], [StockPrice], []),
   'getTransaction' : IDL.Func([IDL.Nat], [IDL.Opt(Transaction)], ['query']),
   'getTransactions' : IDL.Func([], [IDL.Vec(Transaction)], ['query']),
   'getUserProfile' : IDL.Func([IDL.Principal], [IDL.Opt(Public)], ['query']),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'saveCallerUserProfile' : IDL.Func([Public], [], []),
+  'searchStocks' : IDL.Func([IDL.Text], [IDL.Vec(StockSearchResult)], []),
+  'transform' : IDL.Func(
+      [TransformationInput],
+      [TransformationOutput],
+      ['query'],
+    ),
+  'transformSearch' : IDL.Func(
+      [TransformationInput],
+      [TransformationOutput],
+      ['query'],
+    ),
   'updateAsset' : IDL.Func([Public__1], [], []),
   'updateProfile' : IDL.Func([Public], [], []),
   'updateTransaction' : IDL.Func([Transaction], [], []),
@@ -198,9 +239,35 @@ export const idlFactory = ({ IDL }) => {
     ),
     'totalGainLossPercent' : IDL.Float64,
   });
+  const StockPrice = IDL.Record({
+    'ok' : IDL.Bool,
+    'change24h' : IDL.Float64,
+    'price' : IDL.Float64,
+    'symbol' : IDL.Text,
+  });
+  const StockSearchResult = IDL.Record({
+    'name' : IDL.Text,
+    'exchange' : IDL.Text,
+    'symbol' : IDL.Text,
+  });
+  const http_header = IDL.Record({ 'value' : IDL.Text, 'name' : IDL.Text });
+  const http_request_result = IDL.Record({
+    'status' : IDL.Nat,
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(http_header),
+  });
+  const TransformationInput = IDL.Record({
+    'context' : IDL.Vec(IDL.Nat8),
+    'response' : http_request_result,
+  });
+  const TransformationOutput = IDL.Record({
+    'status' : IDL.Nat,
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(http_header),
+  });
   
   return IDL.Service({
-    '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    '_initializeAccessControl' : IDL.Func([], [], []),
     'addAsset' : IDL.Func([Public__1], [IDL.Nat], []),
     'addSnapshot' : IDL.Func([PortfolioSnapshot], [IDL.Nat], []),
     'addTransaction' : IDL.Func([Transaction], [IDL.Nat], []),
@@ -212,18 +279,30 @@ export const idlFactory = ({ IDL }) => {
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(Public)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getHoldings' : IDL.Func([], [IDL.Vec(Holding)], ['query']),
-    'getPortfolioSummary' : IDL.Func([], [PortfolioSummary], []),
+    'getPortfolioSummary' : IDL.Func([], [PortfolioSummary], ['query']),
     'getProfile' : IDL.Func([], [IDL.Opt(Public)], ['query']),
     'getSnapshots' : IDL.Func(
         [IDL.Int, IDL.Int],
         [IDL.Vec(PortfolioSnapshot)],
         ['query'],
       ),
+    'getStockPrice' : IDL.Func([IDL.Text], [StockPrice], []),
     'getTransaction' : IDL.Func([IDL.Nat], [IDL.Opt(Transaction)], ['query']),
     'getTransactions' : IDL.Func([], [IDL.Vec(Transaction)], ['query']),
     'getUserProfile' : IDL.Func([IDL.Principal], [IDL.Opt(Public)], ['query']),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'saveCallerUserProfile' : IDL.Func([Public], [], []),
+    'searchStocks' : IDL.Func([IDL.Text], [IDL.Vec(StockSearchResult)], []),
+    'transform' : IDL.Func(
+        [TransformationInput],
+        [TransformationOutput],
+        ['query'],
+      ),
+    'transformSearch' : IDL.Func(
+        [TransformationInput],
+        [TransformationOutput],
+        ['query'],
+      ),
     'updateAsset' : IDL.Func([Public__1], [], []),
     'updateProfile' : IDL.Func([Public], [], []),
     'updateTransaction' : IDL.Func([Transaction], [], []),
