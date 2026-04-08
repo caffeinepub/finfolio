@@ -53,6 +53,27 @@ const EMPTY_ASSET: Omit<Public__1, "id" | "createdAt"> = {
 };
 
 /**
+ * Determine the native currency that a live price is quoted in.
+ * - Crypto: CoinGecko always returns USD prices regardless of asset.currency
+ * - Forex:  Frankfurter rate is expressed as USD per 1 unit
+ * - Stock:  Yahoo Finance returns VND for VN stocks (.VN suffix), USD otherwise
+ * - Cash:   Value stored in asset.currency
+ */
+function getLivePriceCurrency(
+  category: Category,
+  assetCurrency: string,
+  symbol: string,
+): string {
+  if (category === Category.Crypto) return "USD"; // CoinGecko always USD
+  if (category === Category.Forex) return "USD"; // rate vs USD
+  if (category === Category.Stock) {
+    if (symbol.toUpperCase().endsWith(".VN")) return "VND";
+    return "USD";
+  }
+  return assetCurrency || "USD";
+}
+
+/**
  * Determine if manual price input should be shown.
  * All stocks now use Yahoo Finance via backend -- no API key required.
  */
@@ -186,7 +207,6 @@ export default function AssetsPage() {
       toast.error(`Failed to delete asset: ${msg}`);
     }
   };
-
   const isCash = form.category === Category.Cash;
   const isPending = addAsset.isPending || updateAsset.isPending;
 
@@ -298,7 +318,11 @@ export default function AssetsPage() {
                       ) : (
                         <LivePriceBadge
                           symbol={asset.symbol}
-                          currency={asset.currency}
+                          currency={getLivePriceCurrency(
+                            asset.category,
+                            asset.currency,
+                            asset.symbol,
+                          )}
                         />
                       )}
                     </TableCell>

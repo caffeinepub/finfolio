@@ -82,7 +82,7 @@ export const PriceFeedContext = createContext<PriceFeedContextValue>({
   prices: {},
   isLoading: false,
   refetch: () => {},
-  exchangeRates: { USD: 1 },
+  exchangeRates: { USD: 1, VND: 1 / 25350 },
   convert: (amount) => amount,
   onPricesUpdated: () => () => {},
 });
@@ -183,8 +183,51 @@ async function fetchForexPrice(
 }
 
 /**
+ * Fetch VND/USD rate from open currency API (Frankfurter does not support VND).
+ * Returns how many USD 1 VND is worth (≈ 0.00004).
+ */
+async function fetchVndRate(): Promise<number | null> {
+  try {
+    // Open exchange rate CDN — free, no key, updated daily
+    const res = await fetch(
+      "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.min.json",
+      { signal: AbortSignal.timeout(8000) },
+    );
+    if (res.ok) {
+      const json = (await res.json()) as { usd?: Record<string, number> };
+      const usdRates = json?.usd ?? {};
+      const vndPerUsd = usdRates.vnd;
+      if (typeof vndPerUsd === "number" && vndPerUsd > 1000) {
+        // vndPerUsd ≈ 25000 → 1 VND = 1/25000 USD
+        return 1 / vndPerUsd;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  // Fallback: try exchangerate-api
+  try {
+    const res2 = await fetch("https://api.exchangerate-api.com/v4/latest/USD", {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res2.ok) {
+      const json2 = (await res2.json()) as { rates?: Record<string, number> };
+      const vndPerUsd = json2?.rates?.VND;
+      if (typeof vndPerUsd === "number" && vndPerUsd > 1000) {
+        return 1 / vndPerUsd;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  // Last-resort fallback: approximate VND/USD rate
+  return 1 / 25350;
+}
+
+/**
  * Fetch exchange rates for a batch of currencies vs USD using Frankfurter.
  * Returns a map: currency -> USD per 1 unit of that currency.
+ * Note: Frankfurter does NOT support VND — handled separately via fetchVndRate().
  */
 async function fetchExchangeRates(
   currencies: string[],
@@ -193,40 +236,61 @@ async function fetchExchangeRates(
   if (currencies.length === 0) return rates;
 
   // Filter out non-fiat currencies (BTC, ETH handled separately via price feed)
+  // Also filter VND since Frankfurter doesn't support it — fetched separately
   const fiatCurrencies = currencies.filter(
-    (c) => !["BTC", "ETH", "USD"].includes(c.toUpperCase()),
+    (c) => !["BTC", "ETH", "USD", "VND"].includes(c.toUpperCase()),
   );
-  if (fiatCurrencies.length === 0) return rates;
 
-  try {
-    // Frankfurter: from=USD gives how many units of each currency per 1 USD
-    // We want the inverse: USD per 1 unit of each currency
-    const targets = fiatCurrencies.join(",");
-    const res = await fetch(
-      `https://api.frankfurter.app/latest?from=USD&to=${targets}`,
-      { signal: AbortSignal.timeout(8000) },
-    );
-    if (!res.ok) return rates;
-    const json = (await res.json()) as { rates?: Record<string, number> };
-    if (json?.rates) {
-      for (const [cur, val] of Object.entries(json.rates)) {
-        if (typeof val === "number" && val > 0) {
-          // json.rates[VND] = ~25000 means 1 USD = 25000 VND
-          // So 1 VND = 1/25000 USD
-          rates[cur.toUpperCase()] = 1 / val;
-        }
+  const [frankfurterResult, vndRate] = await Promise.all([
+    fiatCurrencies.length > 0
+      ? (async () => {
+          try {
+            // Frankfurter: from=USD gives how many units of each currency per 1 USD
+            // We want the inverse: USD per 1 unit of each currency
+            const targets = fiatCurrencies.join(",");
+            const res = await fetch(
+              `https://api.frankfurter.app/latest?from=USD&to=${targets}`,
+              { signal: AbortSignal.timeout(8000) },
+            );
+            if (!res.ok) return null;
+            return (await res.json()) as { rates?: Record<string, number> };
+          } catch {
+            return null;
+          }
+        })()
+      : Promise.resolve(null),
+    currencies.some((c) => c.toUpperCase() === "VND")
+      ? fetchVndRate()
+      : Promise.resolve(null),
+  ]);
+
+  if (frankfurterResult?.rates) {
+    for (const [cur, val] of Object.entries(frankfurterResult.rates)) {
+      if (typeof val === "number" && val > 0) {
+        // json.rates[EUR] = ~0.92 means 1 USD = 0.92 EUR → 1 EUR = 1/0.92 USD ≈ 1.087
+        rates[cur.toUpperCase()] = 1 / val;
       }
     }
-  } catch {
-    // Return partial rates
   }
+
+  // Always include VND rate (either fetched or fallback)
+  if (vndRate !== null && vndRate > 0) {
+    rates.VND = vndRate;
+  } else {
+    // Ensure VND always has a fallback so USD→VND conversions never fall through
+    rates.VND = rates.VND ?? 1 / 25350;
+  }
+
   return rates;
 }
 
 export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
   const [prices, setPrices] = useState<PriceMap>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [exchangeRates, setExchangeRates] = useState<ExchangeRates>({ USD: 1 });
+  const [exchangeRates, setExchangeRates] = useState<ExchangeRates>({
+    USD: 1,
+    VND: 1 / 25350,
+  });
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isFetchingRef = useRef(false);
   const firstFetchDone = useRef(false);
