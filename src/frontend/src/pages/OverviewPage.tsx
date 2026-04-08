@@ -74,15 +74,17 @@ function calcHoldingsQuantity(
   }[],
   convert: (amount: number, from: string, to: string) => number,
   baseCurrency: string,
-): Map<bigint, { quantity: number; totalCost: number }> {
-  const map = new Map<bigint, { quantity: number; totalCost: number }>();
+): Map<string, { quantity: number; totalCost: number }> {
+  // Use string keys to avoid bigint vs number runtime type mismatch in Map lookups
+  const map = new Map<string, { quantity: number; totalCost: number }>();
   for (const asset of assets) {
-    map.set(asset.id, { quantity: 0, totalCost: 0 });
+    map.set(String(asset.id), { quantity: 0, totalCost: 0 });
   }
   for (const tx of transactions) {
-    const asset = assets.find((a) => a.id === tx.assetId);
+    const txIdKey = String(tx.assetId);
+    const asset = assets.find((a) => String(a.id) === txIdKey);
     const txCurrency = tx.currency ?? asset?.currency ?? "USD";
-    const current = map.get(tx.assetId) ?? { quantity: 0, totalCost: 0 };
+    const current = map.get(txIdKey) ?? { quantity: 0, totalCost: 0 };
     if (tx.txType === TxType.Buy || tx.txType === TxType.Deposit) {
       // Convert cost to baseCurrency
       const costInBase = convert(
@@ -90,12 +92,12 @@ function calcHoldingsQuantity(
         txCurrency,
         baseCurrency,
       );
-      map.set(tx.assetId, {
+      map.set(txIdKey, {
         quantity: current.quantity + tx.quantity,
         totalCost: current.totalCost + costInBase,
       });
     } else if (tx.txType === TxType.Sell || tx.txType === TxType.Withdraw) {
-      map.set(tx.assetId, {
+      map.set(txIdKey, {
         quantity: current.quantity - tx.quantity,
         totalCost: current.totalCost,
       });
@@ -146,16 +148,16 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
     return m;
   }, [assets]);
 
-  // Build asset lookup map
+  // Build asset lookup map (string keys to avoid bigint/number mismatch at runtime)
   const assetById = useMemo(() => {
-    const m = new Map<bigint, Public__1>();
-    if (assets) for (const a of assets) m.set(a.id, a);
+    const m = new Map<string, Public__1>();
+    if (assets) for (const a of assets) m.set(String(a.id), a);
     return m;
   }, [assets]);
 
   const holdingsMap = useMemo(() => {
     if (!assets || !transactions)
-      return new Map<bigint, { quantity: number; totalCost: number }>();
+      return new Map<string, { quantity: number; totalCost: number }>();
     return calcHoldingsQuantity(assets, transactions, convert, baseCurrency);
   }, [assets, transactions, convert, baseCurrency]);
 
@@ -179,7 +181,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
     const categoryValues: Record<string, number> = {};
 
     for (const asset of assets) {
-      const holding = holdingsMap.get(asset.id);
+      const holding = holdingsMap.get(String(asset.id));
       const quantity = holding?.quantity ?? 0;
       const cost = holding?.totalCost ?? 0;
 
@@ -252,7 +254,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
       const entry = prices[asset.symbol];
       // Skip assets with no live price or zero 24h change data
       if (!entry || entry.price <= 0 || entry.change24h === 0) continue;
-      const holding = holdingsMap.get(asset.id);
+      const holding = holdingsMap.get(String(asset.id));
       const quantity = holding?.quantity ?? 0;
       if (quantity <= 0) continue;
 
@@ -335,7 +337,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
           // Guard against price=0 from a failed API call — fallback to manualPrice
           const livePrice =
             entry && entry.price > 0 ? entry.price : asset.manualPrice;
-          const holding = hMap.get(asset.id);
+          const holding = hMap.get(String(asset.id));
           const qty = holding?.quantity ?? 0;
           if (qty <= 0) continue;
           // CoinGecko prices are in USD for crypto
@@ -675,7 +677,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
               </TableHeader>
               <TableBody>
                 {recentTx.map((tx, i) => {
-                  const asset = assetById.get(tx.assetId);
+                  const asset = assetById.get(String(tx.assetId));
                   const txCurrency = tx.currency ?? asset?.currency ?? "USD";
                   const amountInBase = convert(
                     tx.quantity * tx.price,
