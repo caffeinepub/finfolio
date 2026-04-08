@@ -13,9 +13,9 @@ import List "mo:core/List";
 import MixinAuthorization "mo:caffeineai-authorization/MixinAuthorization";
 import AccessControl "mo:caffeineai-authorization/access-control";
 import HttpOutcall "mo:caffeineai-http-outcalls/outcall";
-import Migration "migration";
 
-(with migration = Migration.run)
+
+
 actor {
   // Types
   module Asset {

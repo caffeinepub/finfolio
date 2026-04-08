@@ -1,4 +1,4 @@
-// Version: 3.0.0
+// Version: 1.0.0
 type Category__164941945 = {#Cash; #Crypto; #Forex; #Stock};
 type Data__791452850<K, V> =
   {var count : Nat__490723111; kvs : [var ?(K, V)]};
@@ -13,18 +13,6 @@ type Nat__490723111 = Nat__920180692;
 type Nat__920180692 = Nat;
 type Node__46230540<K, V> =
   {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
-type OldTransaction__963748675 =
-  {
-    assetId : Nat;
-    createdAt : Int;
-    date : Int;
-    fee : Float;
-    id : Nat;
-    note : Text;
-    price : Float;
-    quantity : Float;
-    txType : TxType__214667256
-  };
 type PortfolioSnapshot__183585082 = Public__173335931;
 type Public__173335931 =
   {createdAt : Int; date : Int; id : Nat; totalValue : Float};
@@ -60,42 +48,9 @@ type Public__786825652 =
     txType : TxType__343382301
   };
 type Transaction__865268250 = Public__786825652;
-type TxType__214667256 = {#Buy; #Deposit; #Sell; #Withdraw};
 type TxType__343382301 = {#Buy; #Deposit; #Sell; #Withdraw};
 type UserRole__1054455867 = {#admin; #guest; #user};
-actor ({
-  stable accessControlState :
-    {
-      var adminAssigned : Bool;
-      userRoles : Map__605269027<Principal, UserRole__1054455867>
-    };
-  stable assets :
-    {
-      var root :
-        Node__46230540<Principal, Map__605269027<Nat, Public__759654708>>;
-      var size : Nat__490723111
-    };
-  stable var exchangeRateCache : [(Text, Float)];
-  stable var exchangeRateCacheTime : Int;
-  stable exchangeRateCacheTtl : Int;
-  stable var nextAssetId : Nat;
-  stable var nextSnapshotId : Nat;
-  stable var nextTransactionId : Nat;
-  stable snapshots :
-    {
-      var root :
-        Node__46230540<Principal,
-                        Map__605269027<Nat, PortfolioSnapshot__183585082>>;
-      var size : Nat__490723111
-    };
-  in transactions :
-    Map__605269027<Principal, Map__605269027<Nat, OldTransaction__963748675>>;
-  stable userProfiles :
-    {
-      var root : Node__46230540<Principal, Public__590275253>;
-      var size : Nat__490723111
-    }
-}, {
+actor {
   stable accessControlState :
     {
       var adminAssigned : Bool;
@@ -131,4 +86,4 @@ actor ({
       var root : Node__46230540<Principal, Public__590275253>;
       var size : Nat__490723111
     }
-}) ;
+};

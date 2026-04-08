@@ -41,17 +41,22 @@ export function convertCurrency(
   const to = toCurrency.toUpperCase();
   if (from === to) return amount;
 
-  // Convert to USD first
+  // Convert to USD first.
+  // rates[currency] = "how many USD is 1 unit of that currency"
+  // e.g. rates["VND"] ≈ 0.00004 (1 VND = 0.00004 USD)
+  // e.g. rates["EUR"] ≈ 1.08    (1 EUR = 1.08 USD)
   let usdAmount: number;
   if (from === "USD") {
     usdAmount = amount;
   } else {
     const fromRate = rates[from];
     if (!fromRate || fromRate === 0) return amount; // unknown rate, return as-is
-    usdAmount = amount / fromRate; // fromRate = 1 unit of FROM in USD
+    usdAmount = amount * fromRate; // multiply: amount_in_FROM × (USD per 1 FROM) = USD
   }
 
-  // Convert USD to target
+  // Convert USD to target currency.
+  // toRate = USD per 1 unit of TO → so 1 USD = 1/toRate units of TO
+  // targetAmount = usdAmount / toRate
   if (to === "USD") return usdAmount;
   const toRate = rates[to];
   if (!toRate || toRate === 0) return usdAmount;
@@ -116,5 +121,6 @@ export function formatDateInput(timestamp: bigint | number): string {
 }
 
 export function dateInputToTimestamp(dateStr: string): bigint {
-  return BigInt(new Date(dateStr).getTime());
+  // Backend expects nanoseconds — multiply milliseconds by 1_000_000
+  return BigInt(new Date(dateStr).getTime()) * 1_000_000n;
 }

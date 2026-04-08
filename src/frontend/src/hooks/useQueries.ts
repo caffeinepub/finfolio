@@ -153,9 +153,8 @@ export function useAddTransaction() {
   return useMutation({
     mutationFn: async (tx: TransactionWithCurrency) => {
       if (!actor) throw new Error("Not connected");
-      // Strip frontend-only currency field before sending to backend
-      const { currency: _currency, ...backendTx } = tx;
-      return actor.addTransaction(backendTx as Transaction);
+      // AddTransactionInput includes currency — pass all fields directly
+      return actor.addTransaction(tx as Transaction);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transactions"] });
@@ -171,9 +170,8 @@ export function useUpdateTransaction() {
   return useMutation({
     mutationFn: async (tx: TransactionWithCurrency) => {
       if (!actor) throw new Error("Not connected");
-      // Strip frontend-only currency field before sending to backend
-      const { currency: _currency, ...backendTx } = tx;
-      return actor.updateTransaction(backendTx as Transaction);
+      // AddTransactionInput includes currency — pass all fields directly
+      return actor.updateTransaction(tx as Transaction);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transactions"] });

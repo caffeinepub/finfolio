@@ -179,7 +179,7 @@ export default function TransactionsPage() {
     const asset = assetById.get(tx.assetId.toString());
     setEditForm({
       txType: tx.txType,
-      date: formatDateInput(Number(tx.date) / 1_000_000),
+      date: formatDateInput(tx.date),
       quantity: tx.quantity.toString(),
       price: tx.price.toString(),
       fee: tx.fee.toString(),
@@ -203,7 +203,7 @@ export default function TransactionsPage() {
     try {
       await addTransaction.mutateAsync({
         id: 0n,
-        createdAt: BigInt(Date.now()),
+        createdAt: BigInt(Date.now()) * 1_000_000n,
         assetId: BigInt(addForm.assetId),
         txType: addForm.txType,
         date: dateInputToTimestamp(addForm.date),

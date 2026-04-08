@@ -198,12 +198,19 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
         );
       } else {
         const entry = prices[asset.symbol];
-        const livePrice = entry?.price ?? asset.manualPrice;
-        // Convert value from asset currency to baseCurrency
-        const valueInAssetCurrency = quantity * livePrice;
+        // Guard against price=0 from a failed API call — fallback to manualPrice
+        const livePrice =
+          entry && entry.price > 0 ? entry.price : asset.manualPrice;
+
+        // CoinGecko prices are always in USD — use "USD" as price currency for crypto.
+        // For stocks/forex, use the asset's declared currency.
+        const priceCurrency =
+          asset.category === Category.Crypto ? "USD" : asset.currency || "USD";
+
+        const valueInPriceCurrency = quantity * livePrice;
         currentValue = convert(
-          valueInAssetCurrency,
-          asset.currency || "USD",
+          valueInPriceCurrency,
+          priceCurrency,
           baseCurrency,
         );
         totalCost += cost; // cost already in baseCurrency (via calcHoldingsQuantity)
@@ -243,12 +250,19 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
     for (const asset of assets) {
       if (asset.category === Category.Cash) continue;
       const entry = prices[asset.symbol];
-      if (!entry || entry.change24h === 0) continue;
+      // Skip assets with no live price or zero 24h change data
+      if (!entry || entry.price <= 0 || entry.change24h === 0) continue;
       const holding = holdingsMap.get(asset.id);
       const quantity = holding?.quantity ?? 0;
+      if (quantity <= 0) continue;
+
+      // Use USD as price currency for crypto (CoinGecko always returns USD)
+      const priceCurrency =
+        asset.category === Category.Crypto ? "USD" : asset.currency || "USD";
+
       const valueInBase = convert(
         quantity * entry.price,
-        asset.currency || "USD",
+        priceCurrency,
         baseCurrency,
       );
       if (valueInBase > 0 && portfolioStats.totalValue > 0) {
@@ -318,13 +332,18 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
           );
         } else {
           const entry = updatedPrices[asset.symbol];
-          const livePrice = entry?.price ?? asset.manualPrice;
+          // Guard against price=0 from a failed API call — fallback to manualPrice
+          const livePrice =
+            entry && entry.price > 0 ? entry.price : asset.manualPrice;
           const holding = hMap.get(asset.id);
-          total += convert(
-            (holding?.quantity ?? 0) * livePrice,
-            asset.currency || "USD",
-            baseCurrency,
-          );
+          const qty = holding?.quantity ?? 0;
+          if (qty <= 0) continue;
+          // CoinGecko prices are in USD for crypto
+          const priceCurrency =
+            asset.category === Category.Crypto
+              ? "USD"
+              : asset.currency || "USD";
+          total += convert(qty * livePrice, priceCurrency, baseCurrency);
         }
       }
       if (total <= 0) return;

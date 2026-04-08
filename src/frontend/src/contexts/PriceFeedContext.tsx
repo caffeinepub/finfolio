@@ -122,19 +122,33 @@ async function fetchCryptoPrices(
   symbols: string[],
 ): Promise<Record<string, { price: number; change24h: number }>> {
   if (symbols.length === 0) return {};
-  const ids = symbols.map(getCoinGeckoId).join(",");
+
+  // Map each symbol to its CoinGecko ID (handles both "bitcoin" already and "BTC" shorthand)
+  const symbolToId = new Map<string, string>();
+  for (const symbol of symbols) {
+    symbolToId.set(symbol, getCoinGeckoId(symbol));
+  }
+  const uniqueIds = [...new Set(symbolToId.values())];
+  const ids = uniqueIds.join(",");
+
   try {
-    const res = await fetch(
-      `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids)}&vs_currencies=usd&include_24hr_change=true`,
-      { signal: AbortSignal.timeout(10000) },
-    );
-    if (!res.ok) return {};
-    const json = await res.json();
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids)}&vs_currencies=usd&include_24hr_change=true`;
+
+    const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    if (!res.ok) {
+      console.warn(`[PriceFeed] CoinGecko returned ${res.status}`);
+      return {};
+    }
+    const json = (await res.json()) as Record<
+      string,
+      { usd?: number; usd_24h_change?: number }
+    >;
+
     const result: Record<string, { price: number; change24h: number }> = {};
     for (const symbol of symbols) {
-      const id = getCoinGeckoId(symbol);
+      const id = symbolToId.get(symbol) ?? getCoinGeckoId(symbol);
       const data = json[id];
-      if (data?.usd) {
+      if (data && typeof data.usd === "number" && data.usd > 0) {
         result[symbol] = {
           price: data.usd,
           change24h: data.usd_24h_change ?? 0,
@@ -142,7 +156,8 @@ async function fetchCryptoPrices(
       }
     }
     return result;
-  } catch {
+  } catch (err) {
+    console.warn("[PriceFeed] CoinGecko fetch error:", err);
     return {};
   }
 }
@@ -158,7 +173,7 @@ async function fetchForexPrice(
       { signal: AbortSignal.timeout(8000) },
     );
     if (!res.ok) return null;
-    const json = await res.json();
+    const json = (await res.json()) as { rates?: Record<string, number> };
     const rate = json?.rates?.USD;
     if (typeof rate !== "number") return null;
     return { price: rate, change24h: 0 };
@@ -192,7 +207,7 @@ async function fetchExchangeRates(
       { signal: AbortSignal.timeout(8000) },
     );
     if (!res.ok) return rates;
-    const json = await res.json();
+    const json = (await res.json()) as { rates?: Record<string, number> };
     if (json?.rates) {
       for (const [cur, val] of Object.entries(json.rates)) {
         if (typeof val === "number" && val > 0) {
@@ -216,6 +231,8 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
   const isFetchingRef = useRef(false);
   const firstFetchDone = useRef(false);
   const listenersRef = useRef<Set<OnPricesUpdatedFn>>(new Set());
+  // Cache: last successfully fetched prices per symbol — prevents zero values on API failure
+  const pricesCacheRef = useRef<PriceMap>({});
   const { data: assets } = useGetAssets();
   const queryClient = useQueryClient();
 
@@ -300,69 +317,113 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
     const now = Date.now();
     const newPrices: PriceMap = {};
 
+    // ── Crypto: use live price, fall back to cached price, then manualPrice ──
     for (const asset of cryptoAssets) {
       const result = cryptoBatchResult[asset.symbol];
-      if (result) {
-        newPrices[asset.symbol] = {
+      if (result && result.price > 0) {
+        // Live price success — update cache
+        const entry: PriceEntry = {
           price: result.price,
           change24h: result.change24h,
           source: "coingecko",
           status: "live",
           updatedAt: now,
         };
+        newPrices[asset.symbol] = entry;
+        pricesCacheRef.current[asset.symbol] = entry;
       } else {
-        newPrices[asset.symbol] = {
-          price: asset.manualPrice,
-          change24h: 0,
-          source: "manual",
-          status: "error",
-          updatedAt: now,
-        };
+        // Live fetch failed — use cached price if available
+        const cached = pricesCacheRef.current[asset.symbol];
+        if (cached && cached.price > 0) {
+          console.warn(
+            `[PriceFeed] Using stale cached price for ${asset.symbol}: $${cached.price}`,
+          );
+          newPrices[asset.symbol] = {
+            ...cached,
+            status: "stale",
+            updatedAt: now,
+          };
+        } else if (asset.manualPrice > 0) {
+          // Last resort: use manualPrice only if it's non-zero
+          newPrices[asset.symbol] = {
+            price: asset.manualPrice,
+            change24h: 0,
+            source: "manual",
+            status: "error",
+            updatedAt: now,
+          };
+        } else {
+          // Truly no data — mark as error but preserve 0 so UI can show "N/A"
+          newPrices[asset.symbol] = {
+            price: 0,
+            change24h: 0,
+            source: "manual",
+            status: "error",
+            updatedAt: now,
+          };
+        }
       }
     }
 
+    // ── Forex ──
     for (const { asset, result } of forexResults) {
       const key = asset.symbol;
-      if (result) {
-        newPrices[key] = {
+      if (result && result.price > 0) {
+        const entry: PriceEntry = {
           price: result.price,
           change24h: result.change24h,
           source: "frankfurter",
           status: "live",
           updatedAt: now,
         };
+        newPrices[key] = entry;
+        pricesCacheRef.current[key] = entry;
       } else {
-        newPrices[key] = {
-          price: asset.manualPrice,
-          change24h: 0,
-          source: "manual",
-          status: "error",
-          updatedAt: now,
-        };
+        const cached = pricesCacheRef.current[key];
+        if (cached && cached.price > 0) {
+          newPrices[key] = { ...cached, status: "stale", updatedAt: now };
+        } else {
+          newPrices[key] = {
+            price: asset.manualPrice,
+            change24h: 0,
+            source: "manual",
+            status: "error",
+            updatedAt: now,
+          };
+        }
       }
     }
 
+    // ── Stocks ──
     for (const { asset, result } of stockResults) {
       const key = asset.symbol;
-      if (result) {
-        newPrices[key] = {
+      if (result && result.price > 0) {
+        const entry: PriceEntry = {
           price: result.price,
           change24h: result.change24h,
           source: "yahoo",
           status: "live",
           updatedAt: now,
         };
+        newPrices[key] = entry;
+        pricesCacheRef.current[key] = entry;
       } else {
-        newPrices[key] = {
-          price: asset.manualPrice,
-          change24h: 0,
-          source: "manual",
-          status: "error",
-          updatedAt: now,
-        };
+        const cached = pricesCacheRef.current[key];
+        if (cached && cached.price > 0) {
+          newPrices[key] = { ...cached, status: "stale", updatedAt: now };
+        } else {
+          newPrices[key] = {
+            price: asset.manualPrice,
+            change24h: 0,
+            source: "manual",
+            status: "error",
+            updatedAt: now,
+          };
+        }
       }
     }
 
+    // ── Cash ──
     for (const asset of assets.filter((a) => a.category === Category.Cash)) {
       newPrices[asset.symbol] = {
         price: asset.manualPrice,
