@@ -338,6 +338,12 @@ export default function OverviewPage({ dateRange }: Props) {
           value: number;
           percentage: number;
         }[],
+        pieAllocation: [] as {
+          name: string;
+          displayName: string;
+          value: number;
+          percentage: number;
+        }[],
       };
     }
 
@@ -348,9 +354,13 @@ export default function OverviewPage({ dateRange }: Props) {
     for (const asset of assets) {
       const holding = holdingsMap.get(String(asset.id));
       const quantity = holding?.quantity ?? 0;
-      const cost = holding?.totalCost ?? 0;
+      const cost = holding?.totalCost ?? 0; // already in baseCurrency
 
       let currentValue: number;
+      // Hoist livePrice so the post-block filter can reference it regardless
+      // of which branch ran (Cash/RealEstate have no live price concept).
+      let livePrice = 0;
+
       if (
         asset.category === Category.Cash ||
         asset.category === Category.RealEstate
@@ -360,28 +370,47 @@ export default function OverviewPage({ dateRange }: Props) {
           asset.currency || "USD",
           baseCurrency,
         );
-        totalCost += convert(
-          asset.manualPrice,
-          asset.currency || "USD",
-          baseCurrency,
-        );
+        totalCost += currentValue;
       } else {
         const entry = prices[asset.symbol];
-        const livePrice =
-          entry && entry.price > 0 ? entry.price : asset.manualPrice;
+        livePrice = entry && entry.price > 0 ? entry.price : 0;
+
         const priceCurrency =
           asset.category === Category.Crypto ||
           asset.category === Category.Commodity
             ? "USD"
             : asset.currency || "USD";
-        const valueInPriceCurrency = quantity * livePrice;
-        currentValue = convert(
-          valueInPriceCurrency,
-          priceCurrency,
-          baseCurrency,
-        );
+
+        if (livePrice > 0) {
+          // Primary: use live price — always takes priority
+          currentValue = convert(
+            quantity * livePrice,
+            priceCurrency,
+            baseCurrency,
+          );
+        } else if (asset.manualPrice > 0) {
+          // Secondary: use manual price set by user
+          currentValue = convert(
+            quantity * asset.manualPrice,
+            priceCurrency,
+            baseCurrency,
+          );
+        } else if (quantity > 0 && cost > 0) {
+          // Tertiary fallback: API failed — use total cost as current value proxy
+          // (cost is already in baseCurrency, no conversion needed)
+          currentValue = cost;
+        } else {
+          currentValue = 0;
+        }
+
         totalCost += cost;
       }
+
+      // Skip only when there is genuinely nothing to show — no live price AND
+      // no computed value. This ensures Commodity assets (e.g. Gold/XAU) whose
+      // price is fetched but quantity=0 (no transactions yet) still appear in
+      // the allocation breakdown with their category registered.
+      if (currentValue <= 0 && livePrice <= 0) continue;
 
       totalValue += currentValue;
       const catKey = asset.category as string;
@@ -391,7 +420,8 @@ export default function OverviewPage({ dateRange }: Props) {
     const gainLoss = totalValue - totalCost;
     const gainLossPercent = totalCost > 0 ? (gainLoss / totalCost) * 100 : 0;
 
-    const allocationByCategory = Object.entries(categoryValues)
+    // pieAllocation: only non-zero categories (pie chart needs value > 0)
+    const pieAllocation = Object.entries(categoryValues)
       .filter(([, value]) => value > 0)
       .map(([name, value]) => ({
         name,
@@ -400,12 +430,24 @@ export default function OverviewPage({ dateRange }: Props) {
         percentage: totalValue > 0 ? (value / totalValue) * 100 : 0,
       }));
 
+    // allocationByCategory: includes zero-value categories so the legend
+    // always shows every category that has an asset with a live price.
+    const allocationByCategory = Object.entries(categoryValues)
+      .map(([name, value]) => ({
+        name,
+        displayName: t(`badges.${name}`, { defaultValue: name }),
+        value,
+        percentage: totalValue > 0 ? (value / totalValue) * 100 : 0,
+      }))
+      .sort((a, b) => b.value - a.value);
+
     return {
       totalValue,
       totalCost,
       gainLoss,
       gainLossPercent,
       allocationByCategory,
+      pieAllocation,
     };
   }, [assets, holdingsMap, prices, convert, baseCurrency, t]);
 
@@ -422,8 +464,12 @@ export default function OverviewPage({ dateRange }: Props) {
     for (const asset of assets) {
       const holding = holdingsMap.get(String(asset.id));
       const quantity = holding?.quantity ?? 0;
+      const cost = holding?.totalCost ?? 0; // already in baseCurrency
 
       let currentValue: number;
+      // Hoist livePrice so the filter below can reference it outside the else block.
+      let livePrice = 0;
+
       if (
         asset.category === Category.Cash ||
         asset.category === Category.RealEstate
@@ -435,21 +481,36 @@ export default function OverviewPage({ dateRange }: Props) {
         );
       } else {
         const entry = prices[asset.symbol];
-        const livePrice =
-          entry && entry.price > 0 ? entry.price : asset.manualPrice;
+        livePrice = entry && entry.price > 0 ? entry.price : 0;
+
         const priceCurrency =
           asset.category === Category.Crypto ||
           asset.category === Category.Commodity
             ? "USD"
             : asset.currency || "USD";
-        currentValue = convert(
-          quantity * livePrice,
-          priceCurrency,
-          baseCurrency,
-        );
+
+        if (livePrice > 0) {
+          currentValue = convert(
+            quantity * livePrice,
+            priceCurrency,
+            baseCurrency,
+          );
+        } else if (asset.manualPrice > 0) {
+          currentValue = convert(
+            quantity * asset.manualPrice,
+            priceCurrency,
+            baseCurrency,
+          );
+        } else if (quantity > 0 && cost > 0) {
+          currentValue = cost;
+        } else {
+          currentValue = 0;
+        }
       }
 
-      if (currentValue <= 0) continue;
+      // Include the asset if it has any value OR if a live price exists (so
+      // the category appears in breakdowns even with zero quantity/transactions).
+      if (currentValue <= 0 && livePrice <= 0) continue;
 
       const catKey = asset.category as string;
       if (!byCategory[catKey]) byCategory[catKey] = [];
@@ -476,7 +537,7 @@ export default function OverviewPage({ dateRange }: Props) {
             })),
         };
       })
-      .filter((cat) => cat.slices.length >= 2); // Only show categories with ≥2 assets
+      .filter((cat) => cat.slices.length >= 1); // Show categories with ≥1 asset
   }, [assets, holdingsMap, prices, convert, baseCurrency, t]);
 
   const dailyChangeStats = useMemo(() => {
@@ -576,17 +637,29 @@ export default function OverviewPage({ dateRange }: Props) {
           );
         } else {
           const entry = updatedPrices[asset.symbol];
-          const livePrice =
-            entry && entry.price > 0 ? entry.price : asset.manualPrice;
+          const livePrice = entry && entry.price > 0 ? entry.price : 0;
           const holding = hMap.get(String(asset.id));
           const qty = holding?.quantity ?? 0;
-          if (qty <= 0) continue;
+          const holdingCost = holding?.totalCost ?? 0;
+          if (qty <= 0 && holdingCost <= 0) continue;
+
           const priceCurrency =
             asset.category === Category.Crypto ||
             asset.category === Category.Commodity
               ? "USD"
               : asset.currency || "USD";
-          total += convert(qty * livePrice, priceCurrency, baseCurrency);
+
+          if (livePrice > 0) {
+            total += convert(qty * livePrice, priceCurrency, baseCurrency);
+          } else if (asset.manualPrice > 0) {
+            total += convert(
+              qty * asset.manualPrice,
+              priceCurrency,
+              baseCurrency,
+            );
+          } else if (holdingCost > 0) {
+            total += holdingCost;
+          }
         }
       }
       if (total <= 0) return;
@@ -811,7 +884,18 @@ export default function OverviewPage({ dateRange }: Props) {
               >
                 <PieChart>
                   <Pie
-                    data={portfolioStats.allocationByCategory}
+                    data={
+                      portfolioStats.pieAllocation.length > 0
+                        ? portfolioStats.pieAllocation
+                        : [
+                            {
+                              name: "empty",
+                              displayName: "",
+                              value: 1,
+                              percentage: 100,
+                            },
+                          ]
+                    }
                     cx="50%"
                     cy="50%"
                     innerRadius={55}
@@ -820,11 +904,17 @@ export default function OverviewPage({ dateRange }: Props) {
                     dataKey="value"
                     nameKey="name"
                   >
-                    {portfolioStats.allocationByCategory.map((entry) => (
+                    {(portfolioStats.pieAllocation.length > 0
+                      ? portfolioStats.pieAllocation
+                      : [{ name: "empty" }]
+                    ).map((entry) => (
                       <Cell
                         key={entry.name}
                         fill={
-                          CATEGORY_COLORS[entry.name] ?? "oklch(0.6 0.1 240)"
+                          entry.name === "empty"
+                            ? "oklch(0.24 0.04 240)"
+                            : (CATEGORY_COLORS[entry.name] ??
+                              "oklch(0.6 0.1 240)")
                         }
                       />
                     ))}
@@ -866,7 +956,7 @@ export default function OverviewPage({ dateRange }: Props) {
                   )}
                 </p>
               </div>
-              {/* Legend with translated names */}
+              {/* Legend — shows ALL categories including zero-value ones */}
               <div className="space-y-1.5">
                 {portfolioStats.allocationByCategory.map((entry) => (
                   <div
@@ -885,8 +975,12 @@ export default function OverviewPage({ dateRange }: Props) {
                         {entry.displayName}
                       </span>
                     </div>
-                    <span className="text-foreground font-medium ml-2 flex-shrink-0">
-                      {entry.percentage.toFixed(1)}%
+                    <span
+                      className={`font-medium ml-2 flex-shrink-0 ${entry.value <= 0 ? "text-muted-foreground" : "text-foreground"}`}
+                    >
+                      {entry.value <= 0
+                        ? t("overview.noHoldings", { defaultValue: "—" })
+                        : `${entry.percentage.toFixed(1)}%`}
                     </span>
                   </div>
                 ))}
@@ -939,12 +1033,23 @@ export default function OverviewPage({ dateRange }: Props) {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {/* Pie chart */}
+                  {/* Pie chart — falls back to a muted ring when all values are 0 */}
                   <div className="flex-shrink-0">
                     <ResponsiveContainer width={120} height={120}>
                       <PieChart>
                         <Pie
-                          data={cat.slices}
+                          data={
+                            cat.slices.some((s) => s.value > 0)
+                              ? cat.slices
+                              : [
+                                  {
+                                    symbol: "empty",
+                                    name: "",
+                                    value: 1,
+                                    percentage: 100,
+                                  },
+                                ]
+                          }
                           cx="50%"
                           cy="50%"
                           innerRadius={32}
@@ -953,10 +1058,17 @@ export default function OverviewPage({ dateRange }: Props) {
                           dataKey="value"
                           nameKey="symbol"
                         >
-                          {cat.slices.map((slice, idx) => (
+                          {(cat.slices.some((s) => s.value > 0)
+                            ? cat.slices
+                            : [{ symbol: "empty" }]
+                          ).map((slice, idx) => (
                             <Cell
                               key={slice.symbol}
-                              fill={SLICE_PALETTE[idx % SLICE_PALETTE.length]}
+                              fill={
+                                slice.symbol === "empty"
+                                  ? "oklch(0.24 0.04 240)"
+                                  : SLICE_PALETTE[idx % SLICE_PALETTE.length]
+                              }
                             />
                           ))}
                         </Pie>
@@ -1005,11 +1117,19 @@ export default function OverviewPage({ dateRange }: Props) {
                           </span>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-foreground font-medium tabular-nums">
-                            {slice.percentage.toFixed(1)}%
+                          <span
+                            className={`font-medium tabular-nums ${slice.value <= 0 ? "text-muted-foreground" : "text-foreground"}`}
+                          >
+                            {slice.value <= 0
+                              ? "—"
+                              : `${slice.percentage.toFixed(1)}%`}
                           </span>
                           <span className="text-muted-foreground tabular-nums hidden sm:inline">
-                            {formatCurrency(slice.value, baseCurrency, true)}
+                            {slice.value <= 0
+                              ? t("overview.noHoldings", {
+                                  defaultValue: "No holdings",
+                                })
+                              : formatCurrency(slice.value, baseCurrency, true)}
                           </span>
                         </div>
                       </div>

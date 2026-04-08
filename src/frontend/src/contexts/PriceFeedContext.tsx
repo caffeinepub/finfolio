@@ -354,6 +354,20 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
         console.warn(
           `[PriceFeed] No Yahoo futures symbol mapping for metal: ${sym}`,
         );
+        // If no mapping, try fetching with the asset symbol directly (last resort)
+        if (actor?.getStockPrice) {
+          try {
+            const res = await actor.getStockPrice(sym);
+            if (res.ok && res.price > 0) {
+              return {
+                asset,
+                result: { price: res.price, change24h: res.change24h },
+              };
+            }
+          } catch {
+            /* ignore */
+          }
+        }
         return { asset, result: null };
       }
       if (actor?.getStockPrice) {
@@ -368,6 +382,18 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
           console.warn(
             `[PriceFeed] Metal price fetch returned no data for ${sym} (${yahooSymbol}): ok=${res.ok}, price=${res.price}`,
           );
+          // Retry once with the asset symbol itself as fallback
+          try {
+            const res2 = await actor.getStockPrice(sym);
+            if (res2.ok && res2.price > 0) {
+              return {
+                asset,
+                result: { price: res2.price, change24h: res2.change24h },
+              };
+            }
+          } catch {
+            /* ignore */
+          }
         } catch (err) {
           console.warn(
             `[PriceFeed] Metal price fetch failed for ${sym} (${yahooSymbol}):`,
@@ -573,6 +599,7 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
         newPrices[key] = entry;
         pricesCacheRef.current[key] = entry;
       } else {
+        // Fallback chain: cached → manualPrice → retry with Yahoo symbol directly
         const cached = pricesCacheRef.current[key];
         if (cached && cached.price > 0) {
           newPrices[key] = { ...cached, status: "stale", updatedAt: now };
@@ -585,6 +612,8 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
             updatedAt: now,
           };
         } else {
+          // Keep price undefined so OverviewPage can use avgCost fallback
+          // Don't store a zero-price entry — it would look like the asset has no value
           newPrices[key] = {
             price: 0,
             change24h: 0,
