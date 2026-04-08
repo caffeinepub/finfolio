@@ -4,7 +4,6 @@ import { Category } from "@/backend.d";
 import { TxTypeBadge } from "@/components/Badges";
 import KpiCard from "@/components/KpiCard";
 import { EmptyState, PageLoader } from "@/components/LoadingStates";
-import TopBar from "@/components/TopBar";
 import {
   Table,
   TableBody,
@@ -47,11 +46,27 @@ const CATEGORY_COLORS: Record<string, string> = {
   Cash: "oklch(0.75 0.18 55)",
   Commodity: "oklch(0.78 0.18 80)",
   RealEstate: "oklch(0.65 0.15 180)",
+  Bond: "oklch(0.65 0.18 30)",
+  Fund: "oklch(0.68 0.16 200)",
+  Savings: "oklch(0.72 0.14 100)",
 };
+
+// Colors for individual assets within a category pie chart
+const SLICE_PALETTE = [
+  "oklch(0.72 0.2 155)",
+  "oklch(0.6 0.2 250)",
+  "oklch(0.75 0.18 55)",
+  "oklch(0.78 0.18 80)",
+  "oklch(0.65 0.15 180)",
+  "oklch(0.6 0.22 300)",
+  "oklch(0.65 0.18 30)",
+  "oklch(0.68 0.16 200)",
+  "oklch(0.72 0.14 100)",
+  "oklch(0.7 0.18 340)",
+];
 
 interface Props {
   dateRange: string;
-  onDateRangeChange: (range: string) => void;
 }
 
 function getDateRangeMs(label: string): number {
@@ -109,7 +124,151 @@ function calcHoldingsQuantity(
 
 const SNAPSHOT_THROTTLE_MS = 5 * 60 * 1000;
 
-export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
+// Custom tooltip for the main allocation donut chart
+function AllocationTooltip({
+  active,
+  payload,
+  baseCurrency,
+  tValue,
+  tShare,
+}: {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number;
+    payload: { percentage: number; displayName: string };
+  }>;
+  baseCurrency: string;
+  tValue: string;
+  tShare: string;
+}) {
+  if (!active || !payload || !payload.length) return null;
+  const item = payload[0];
+  const catKey = item.name as string;
+  const value = item.value as number;
+  const pct = item.payload.percentage;
+  const displayName = item.payload.displayName;
+  const color = (CATEGORY_COLORS[catKey] ?? "oklch(0.6 0.1 240)") as string;
+  return (
+    <div
+      style={{
+        background: "oklch(0.17 0.035 240)",
+        border: "1px solid oklch(0.24 0.04 240)",
+        borderRadius: 8,
+        color: "oklch(0.93 0.015 240)",
+        fontSize: 12,
+        padding: "8px 12px",
+        minWidth: 170,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          marginBottom: 4,
+        }}
+      >
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: color,
+            display: "inline-block",
+            flexShrink: 0,
+          }}
+        />
+        <span style={{ fontWeight: 600 }}>{displayName}</span>
+      </div>
+      <div
+        style={{ display: "flex", justifyContent: "space-between", gap: 16 }}
+      >
+        <span style={{ color: "oklch(0.65 0.02 240)" }}>{tValue}</span>
+        <span>{formatCurrency(value, baseCurrency)}</span>
+      </div>
+      <div
+        style={{ display: "flex", justifyContent: "space-between", gap: 16 }}
+      >
+        <span style={{ color: "oklch(0.65 0.02 240)" }}>{tShare}</span>
+        <span>{pct.toFixed(1)}%</span>
+      </div>
+    </div>
+  );
+}
+
+// Custom tooltip for per-category asset pie charts
+function CategoryAssetTooltip({
+  active,
+  payload,
+  baseCurrency,
+  tValue,
+  tShare,
+}: {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number;
+    payload: { percentage: number; symbol: string };
+  }>;
+  baseCurrency: string;
+  tValue: string;
+  tShare: string;
+}) {
+  if (!active || !payload || !payload.length) return null;
+  const item = payload[0];
+  const value = item.value as number;
+  const pct = item.payload.percentage;
+  const symbol = item.payload.symbol;
+  return (
+    <div
+      style={{
+        background: "oklch(0.17 0.035 240)",
+        border: "1px solid oklch(0.24 0.04 240)",
+        borderRadius: 8,
+        color: "oklch(0.93 0.015 240)",
+        fontSize: 12,
+        padding: "8px 12px",
+        minWidth: 170,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          marginBottom: 4,
+        }}
+      >
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: SLICE_PALETTE[0],
+            display: "inline-block",
+            flexShrink: 0,
+          }}
+        />
+        <span style={{ fontWeight: 600 }}>{symbol}</span>
+      </div>
+      <div
+        style={{ display: "flex", justifyContent: "space-between", gap: 16 }}
+      >
+        <span style={{ color: "oklch(0.65 0.02 240)" }}>{tValue}</span>
+        <span>{formatCurrency(value, baseCurrency)}</span>
+      </div>
+      <div
+        style={{ display: "flex", justifyContent: "space-between", gap: 16 }}
+      >
+        <span style={{ color: "oklch(0.65 0.02 240)" }}>{tShare}</span>
+        <span>{pct.toFixed(1)}%</span>
+      </div>
+    </div>
+  );
+}
+
+export default function OverviewPage({ dateRange }: Props) {
   const { t } = useTranslation();
   const rangeMs = getDateRangeMs(dateRange);
   const NS_PER_MS = 1_000_000n;
@@ -169,6 +328,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
         gainLossPercent: 0,
         allocationByCategory: [] as {
           name: string;
+          displayName: string;
           value: number;
           percentage: number;
         }[],
@@ -229,6 +389,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
       .filter(([, value]) => value > 0)
       .map(([name, value]) => ({
         name,
+        displayName: t(`badges.${name}`, { defaultValue: name }),
         value,
         percentage: totalValue > 0 ? (value / totalValue) * 100 : 0,
       }));
@@ -240,7 +401,77 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
       gainLossPercent,
       allocationByCategory,
     };
-  }, [assets, holdingsMap, prices, convert, baseCurrency]);
+  }, [assets, holdingsMap, prices, convert, baseCurrency, t]);
+
+  // Per-category asset breakdown for individual pie charts
+  const categoryAssetBreakdowns = useMemo(() => {
+    if (!assets || assets.length === 0) return [];
+
+    // Group assets by category with their values
+    const byCategory: Record<
+      string,
+      Array<{ symbol: string; name: string; value: number }>
+    > = {};
+
+    for (const asset of assets) {
+      const holding = holdingsMap.get(String(asset.id));
+      const quantity = holding?.quantity ?? 0;
+
+      let currentValue: number;
+      if (
+        asset.category === Category.Cash ||
+        asset.category === Category.RealEstate
+      ) {
+        currentValue = convert(
+          asset.manualPrice,
+          asset.currency || "USD",
+          baseCurrency,
+        );
+      } else {
+        const entry = prices[asset.symbol];
+        const livePrice =
+          entry && entry.price > 0 ? entry.price : asset.manualPrice;
+        const priceCurrency =
+          asset.category === Category.Crypto ||
+          asset.category === Category.Commodity
+            ? "USD"
+            : asset.currency || "USD";
+        currentValue = convert(
+          quantity * livePrice,
+          priceCurrency,
+          baseCurrency,
+        );
+      }
+
+      if (currentValue <= 0) continue;
+
+      const catKey = asset.category as string;
+      if (!byCategory[catKey]) byCategory[catKey] = [];
+      byCategory[catKey].push({
+        symbol: asset.symbol,
+        name: asset.name || asset.symbol,
+        value: currentValue,
+      });
+    }
+
+    return Object.entries(byCategory)
+      .filter(([, items]) => items.length > 0)
+      .map(([catKey, items]) => {
+        const total = items.reduce((sum, i) => sum + i.value, 0);
+        return {
+          category: catKey,
+          displayName: t(`badges.${catKey}`, { defaultValue: catKey }),
+          color: CATEGORY_COLORS[catKey] ?? "oklch(0.6 0.1 240)",
+          slices: items
+            .sort((a, b) => b.value - a.value)
+            .map((item) => ({
+              ...item,
+              percentage: total > 0 ? (item.value / total) * 100 : 0,
+            })),
+        };
+      })
+      .filter((cat) => cat.slices.length >= 2); // Only show categories with ≥2 assets
+  }, [assets, holdingsMap, prices, convert, baseCurrency, t]);
 
   const dailyChangeStats = useMemo(() => {
     if (!assets || assets.length === 0 || portfolioStats.totalValue === 0) {
@@ -381,12 +612,13 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
     [baseCurrency],
   );
 
-  return (
-    <div className="animate-fade-in">
-      <TopBar dateRange={dateRange} onDateRangeChange={onDateRangeChange} />
+  const tValue = t("overview.valueCol");
+  const tShare = t("overview.shareCol");
 
+  return (
+    <div className="animate-fade-in px-0">
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
         <KpiCard
           title={`${t("overview.totalPortfolioValue")} (${baseCurrency})`}
           value={
@@ -439,28 +671,30 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
         {/* Performance Chart */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.4 }}
-          className="lg:col-span-2 bg-card border border-border rounded-xl p-5 shadow-card"
+          className="lg:col-span-2 bg-card border border-border rounded-xl p-4 sm:p-5 shadow-card"
         >
-          <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center justify-between mb-4 sm:mb-5">
             <div>
-              <h2 className="text-base font-bold text-foreground">
+              <h2 className="text-sm sm:text-base font-bold text-foreground">
                 {t("overview.portfolioPerformance")}
               </h2>
-              <p className="text-sm text-muted-foreground">{dateRange}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                {dateRange}
+              </p>
             </div>
           </div>
           {snapsLoading ? (
-            <div className="h-56 flex items-center justify-center">
+            <div className="h-40 sm:h-56 flex items-center justify-center">
               <PageLoader />
             </div>
           ) : chartData.length === 0 ? (
-            <div className="h-56 flex flex-col items-center justify-center text-center gap-2">
+            <div className="h-40 sm:h-56 flex flex-col items-center justify-center text-center gap-2">
               <p className="text-muted-foreground text-sm font-medium">
                 {t("overview.noHistoryYet")}
               </p>
@@ -469,7 +703,11 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
               </p>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer
+              width="100%"
+              height={180}
+              className="sm:!h-[220px] lg:!h-[240px]"
+            >
               <AreaChart
                 data={chartData}
                 margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
@@ -536,29 +774,33 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
           )}
         </motion.div>
 
-        {/* Allocation Chart */}
+        {/* Main Allocation Donut Chart */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25, duration: 0.4 }}
-          className="bg-card border border-border rounded-xl p-5 shadow-card"
+          className="bg-card border border-border rounded-xl p-4 sm:p-5 shadow-card"
         >
-          <h2 className="text-base font-bold text-foreground mb-5">
+          <h2 className="text-sm sm:text-base font-bold text-foreground mb-4 sm:mb-5">
             {t("overview.assetAllocation")}
           </h2>
           {isLoading ? (
-            <div className="h-56 flex items-center justify-center">
+            <div className="h-40 sm:h-56 flex items-center justify-center">
               <PageLoader />
             </div>
           ) : portfolioStats.allocationByCategory.length === 0 ? (
-            <div className="h-56 flex flex-col items-center justify-center text-center">
+            <div className="h-40 sm:h-56 flex flex-col items-center justify-center text-center">
               <p className="text-muted-foreground text-sm">
                 {t("overview.noAssetsYet")}
               </p>
             </div>
           ) : (
             <>
-              <ResponsiveContainer width="100%" height={180}>
+              <ResponsiveContainer
+                width="100%"
+                height={160}
+                className="sm:!h-[180px]"
+              >
                 <PieChart>
                   <Pie
                     data={portfolioStats.allocationByCategory}
@@ -568,6 +810,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
                     outerRadius={80}
                     paddingAngle={2}
                     dataKey="value"
+                    nameKey="name"
                   >
                     {portfolioStats.allocationByCategory.map((entry) => (
                       <Cell
@@ -579,74 +822,24 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
                     ))}
                   </Pie>
                   <Tooltip
-                    content={({ active, payload }) => {
-                      if (!active || !payload || !payload.length) return null;
-                      const item = payload[0];
-                      const name = item.name as string;
-                      const value = item.value as number;
-                      const pct = (item.payload as { percentage: number })
-                        .percentage;
-                      const color = (CATEGORY_COLORS[name] ??
-                        "oklch(0.6 0.1 240)") as string;
-                      return (
-                        <div
-                          style={{
-                            background: "oklch(0.17 0.035 240)",
-                            border: "1px solid oklch(0.24 0.04 240)",
-                            borderRadius: 8,
-                            color: "oklch(0.93 0.015 240)",
-                            fontSize: 12,
-                            padding: "8px 12px",
-                            minWidth: 160,
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                              marginBottom: 4,
-                            }}
-                          >
-                            <span
-                              style={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: "50%",
-                                background: color,
-                                display: "inline-block",
-                                flexShrink: 0,
-                              }}
-                            />
-                            <span style={{ fontWeight: 600 }}>{name}</span>
-                          </div>
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              gap: 16,
-                            }}
-                          >
-                            <span style={{ color: "oklch(0.65 0.02 240)" }}>
-                              {t("overview.valueCol")}
-                            </span>
-                            <span>{formatCurrency(value, baseCurrency)}</span>
-                          </div>
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              gap: 16,
-                            }}
-                          >
-                            <span style={{ color: "oklch(0.65 0.02 240)" }}>
-                              {t("overview.shareCol")}
-                            </span>
-                            <span>{pct.toFixed(1)}%</span>
-                          </div>
-                        </div>
-                      );
-                    }}
+                    content={(props) => (
+                      <AllocationTooltip
+                        active={props.active}
+                        payload={
+                          props.payload as Array<{
+                            name: string;
+                            value: number;
+                            payload: {
+                              percentage: number;
+                              displayName: string;
+                            };
+                          }>
+                        }
+                        baseCurrency={baseCurrency}
+                        tValue={tValue}
+                        tShare={tShare}
+                      />
+                    )}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -662,25 +855,26 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
                   )}
                 </p>
               </div>
+              {/* Legend with translated names */}
               <div className="space-y-1.5">
                 {portfolioStats.allocationByCategory.map((entry) => (
                   <div
                     key={entry.name}
                     className="flex items-center justify-between text-xs"
                   >
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
                       <div
-                        className="w-2 h-2 rounded-full"
+                        className="w-2 h-2 rounded-full flex-shrink-0"
                         style={{
                           background:
                             CATEGORY_COLORS[entry.name] ?? "oklch(0.6 0.1 240)",
                         }}
                       />
-                      <span className="text-muted-foreground">
-                        {entry.name}
+                      <span className="text-muted-foreground truncate">
+                        {entry.displayName}
                       </span>
                     </div>
-                    <span className="text-foreground font-medium">
+                    <span className="text-foreground font-medium ml-2 flex-shrink-0">
                       {entry.percentage.toFixed(1)}%
                     </span>
                   </div>
@@ -691,14 +885,139 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
         </motion.div>
       </div>
 
+      {/* Per-Category Breakdown Pie Charts */}
+      {categoryAssetBreakdowns.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.4 }}
+          className="mb-4 sm:mb-6"
+        >
+          <div className="mb-3 sm:mb-4">
+            <h2 className="text-sm sm:text-base font-bold text-foreground">
+              {t("overview.categoryBreakdown")}
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {t("overview.categoryBreakdownDesc")}
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+            {categoryAssetBreakdowns.map((cat, catIdx) => (
+              <motion.div
+                key={cat.category}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.32 + catIdx * 0.08, duration: 0.35 }}
+                className="bg-card border border-border rounded-xl p-4 shadow-card"
+              >
+                {/* Category header */}
+                <div className="flex items-center gap-2 mb-3">
+                  <div
+                    className="w-3 h-3 rounded-full flex-shrink-0"
+                    style={{ background: cat.color }}
+                  />
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {cat.displayName}
+                  </h3>
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {cat.slices.length}{" "}
+                    {cat.slices.length === 1
+                      ? t("common.asset")
+                      : t("common.assets")}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {/* Pie chart */}
+                  <div className="flex-shrink-0">
+                    <ResponsiveContainer width={120} height={120}>
+                      <PieChart>
+                        <Pie
+                          data={cat.slices}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={32}
+                          outerRadius={52}
+                          paddingAngle={2}
+                          dataKey="value"
+                          nameKey="symbol"
+                        >
+                          {cat.slices.map((slice, idx) => (
+                            <Cell
+                              key={slice.symbol}
+                              fill={SLICE_PALETTE[idx % SLICE_PALETTE.length]}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          content={(props) => (
+                            <CategoryAssetTooltip
+                              active={props.active}
+                              payload={
+                                props.payload as Array<{
+                                  name: string;
+                                  value: number;
+                                  payload: {
+                                    percentage: number;
+                                    symbol: string;
+                                  };
+                                }>
+                              }
+                              baseCurrency={baseCurrency}
+                              tValue={tValue}
+                              tShare={tShare}
+                            />
+                          )}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Slice legend */}
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    {cat.slices.map((slice, idx) => (
+                      <div
+                        key={slice.symbol}
+                        className="flex items-center justify-between text-xs gap-2"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <div
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{
+                              background:
+                                SLICE_PALETTE[idx % SLICE_PALETTE.length],
+                            }}
+                          />
+                          <span className="text-muted-foreground font-mono truncate">
+                            {slice.symbol}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-foreground font-medium tabular-nums">
+                            {slice.percentage.toFixed(1)}%
+                          </span>
+                          <span className="text-muted-foreground tabular-nums hidden sm:inline">
+                            {formatCurrency(slice.value, baseCurrency, true)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
       {/* Recent Transactions */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.4 }}
-        className="bg-card border border-border rounded-xl p-5 shadow-card"
+        transition={{ delay: 0.35, duration: 0.4 }}
+        className="bg-card border border-border rounded-xl p-4 sm:p-5 shadow-card"
       >
-        <h2 className="text-base font-bold text-foreground mb-4">
+        <h2 className="text-sm sm:text-base font-bold text-foreground mb-3 sm:mb-4">
           {t("overview.recentTransactions")}
         </h2>
         {txLoading ? (
@@ -710,26 +1029,26 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
             icon={ArrowLeftRight}
           />
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="overflow-x-auto w-full">
+            <Table className="min-w-[480px]">
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="text-muted-foreground text-xs">
+                  <TableHead className="text-muted-foreground text-xs whitespace-nowrap">
                     {t("overview.date")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs">
+                  <TableHead className="text-muted-foreground text-xs whitespace-nowrap">
                     {t("overview.typeCol")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs">
+                  <TableHead className="text-muted-foreground text-xs whitespace-nowrap">
                     {t("overview.assetCol")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right">
+                  <TableHead className="text-muted-foreground text-xs text-right whitespace-nowrap">
                     {t("overview.qty")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right">
+                  <TableHead className="text-muted-foreground text-xs text-right whitespace-nowrap hidden sm:table-cell">
                     {t("overview.priceCol")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right">
+                  <TableHead className="text-muted-foreground text-xs text-right whitespace-nowrap">
                     {t("overview.amountCol")} ({baseCurrency})
                   </TableHead>
                 </TableRow>
@@ -761,7 +1080,7 @@ export default function OverviewPage({ dateRange, onDateRangeChange }: Props) {
                       <TableCell className="text-xs text-right text-foreground tabular-nums">
                         {tx.quantity.toLocaleString()}
                       </TableCell>
-                      <TableCell className="text-xs text-right text-muted-foreground tabular-nums">
+                      <TableCell className="text-xs text-right text-muted-foreground tabular-nums hidden sm:table-cell">
                         {formatCurrency(tx.price, txCurrency)}
                       </TableCell>
                       <TableCell

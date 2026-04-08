@@ -194,9 +194,10 @@ export default function AssetsPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">
+      {/* Page header — flex-wrap on mobile */}
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-4 sm:mb-6">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">
             {t("assets.title")}
           </h1>
           <p className="text-muted-foreground text-sm mt-0.5">
@@ -205,7 +206,7 @@ export default function AssetsPage() {
         </div>
         <Button
           onClick={openAdd}
-          className="bg-fin-green text-background hover:bg-fin-green/90 gap-2"
+          className="bg-fin-green text-background hover:bg-fin-green/90 gap-2 min-h-[44px] shrink-0"
           data-ocid="assets.add_button"
         >
           <Plus className="w-4 h-4" /> {t("assets.addAsset")}
@@ -235,11 +236,11 @@ export default function AssetsPage() {
             />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="overflow-x-auto w-full rounded-lg">
+            <Table className="min-w-[700px]">
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="text-muted-foreground text-xs pl-5">
+                  <TableHead className="text-muted-foreground text-xs pl-4 sm:pl-5">
                     {t("assets.symbolCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs">
@@ -254,7 +255,7 @@ export default function AssetsPage() {
                   <TableHead className="text-muted-foreground text-xs text-right">
                     {t("assets.livePriceCol")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right pr-5">
+                  <TableHead className="text-muted-foreground text-xs text-right pr-4 sm:pr-5">
                     {t("assets.actionsCol")}
                   </TableHead>
                 </TableRow>
@@ -266,24 +267,24 @@ export default function AssetsPage() {
                     className="border-border hover:bg-muted/30"
                     data-ocid={`assets.item.${i + 1}`}
                   >
-                    <TableCell className="pl-5">
-                      <span className="text-sm font-bold font-mono text-foreground">
+                    <TableCell className="pl-4 sm:pl-5">
+                      <span className="text-xs sm:text-sm font-bold font-mono text-foreground">
                         {displaySymbol(asset.symbol)}
                       </span>
                     </TableCell>
-                    <TableCell className="text-sm text-foreground">
+                    <TableCell className="text-xs sm:text-sm text-foreground">
                       {asset.name}
                     </TableCell>
                     <TableCell>
                       <CategoryBadge category={asset.category} />
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="text-xs sm:text-sm text-muted-foreground">
                       {asset.currency}
                     </TableCell>
                     <TableCell className="text-right">
                       {asset.category === Category.Cash ||
                       asset.category === Category.RealEstate ? (
-                        <span className="text-sm font-mono text-foreground">
+                        <span className="text-xs sm:text-sm font-mono text-foreground whitespace-nowrap">
                           {formatCurrencyVal(asset.manualPrice, asset.currency)}
                         </span>
                       ) : (
@@ -297,23 +298,25 @@ export default function AssetsPage() {
                         />
                       )}
                     </TableCell>
-                    <TableCell className="text-right pr-5">
+                    <TableCell className="text-right pr-4 sm:pr-5">
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          className="h-8 w-8 sm:h-7 sm:w-7 text-muted-foreground hover:text-foreground"
                           onClick={() => openEdit(asset)}
                           data-ocid={`assets.edit_button.${i + 1}`}
+                          aria-label={t("assets.editAsset")}
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-fin-red"
+                          className="h-8 w-8 sm:h-7 sm:w-7 text-muted-foreground hover:text-fin-red"
                           onClick={() => setDeleteTarget(asset)}
                           data-ocid={`assets.delete_button.${i + 1}`}
+                          aria-label={t("common.delete")}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
@@ -330,7 +333,7 @@ export default function AssetsPage() {
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
-          className="bg-card border-border max-w-md"
+          className="bg-card border-border w-full max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[90vh] overflow-y-auto"
           data-ocid="assets.dialog"
         >
           <DialogHeader>
@@ -639,12 +642,12 @@ export default function AssetsPage() {
                 data-ocid="assets.note.input"
               />
             </div>
-            <DialogFooter>
+            <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => setDialogOpen(false)}
-                className="text-muted-foreground"
+                className="text-muted-foreground w-full sm:w-auto"
                 data-ocid="assets.cancel_button"
               >
                 {t("common.cancel")}
@@ -652,7 +655,7 @@ export default function AssetsPage() {
               <Button
                 type="submit"
                 disabled={isPending}
-                className="bg-fin-green text-background hover:bg-fin-green/90"
+                className="bg-fin-green text-background hover:bg-fin-green/90 w-full sm:w-auto"
                 data-ocid="assets.submit_button"
               >
                 {isPending
@@ -671,7 +674,7 @@ export default function AssetsPage() {
         open={!!deleteTarget}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
       >
-        <AlertDialogContent className="bg-card border-border">
+        <AlertDialogContent className="bg-card border-border w-full max-w-[calc(100vw-2rem)] sm:max-w-sm">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground">
               {t("assets.deleteTitle")}

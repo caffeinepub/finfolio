@@ -117,9 +117,10 @@ export default function PortfolioPage() {
       transition={{ duration: 0.4 }}
       className="space-y-4"
     >
-      <div className="flex items-center justify-between mb-6">
+      {/* Page header — responsive flex */}
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-4 sm:mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">
             {t("portfolio.title")}
           </h1>
           <p className="text-muted-foreground text-sm mt-0.5">
@@ -158,29 +159,29 @@ export default function PortfolioPage() {
             />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="overflow-x-auto w-full rounded-lg">
+            <Table className="min-w-[600px]">
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="text-muted-foreground text-xs pl-5">
+                  <TableHead className="text-muted-foreground text-xs pl-4 sm:pl-5 whitespace-nowrap">
                     {t("portfolio.assetCol")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs">
+                  <TableHead className="text-muted-foreground text-xs whitespace-nowrap">
                     {t("portfolio.categoryCol")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right">
+                  <TableHead className="text-muted-foreground text-xs text-right whitespace-nowrap">
                     {t("portfolio.quantityCol")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right">
+                  <TableHead className="text-muted-foreground text-xs text-right whitespace-nowrap">
                     {t("portfolio.avgCostCol")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right">
+                  <TableHead className="text-muted-foreground text-xs text-right whitespace-nowrap">
                     {t("portfolio.livePriceCol")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right">
+                  <TableHead className="text-muted-foreground text-xs text-right whitespace-nowrap">
                     {t("portfolio.valueCol")} ({baseCurrency})
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right pr-5">
+                  <TableHead className="text-muted-foreground text-xs text-right pr-4 sm:pr-5 whitespace-nowrap">
                     {t("portfolio.gainLossCol")} ({baseCurrency})
                   </TableHead>
                 </TableRow>
@@ -202,9 +203,9 @@ export default function PortfolioPage() {
                       className="border-border hover:bg-muted/30 transition-colors"
                       data-ocid={`portfolio.item.${i + 1}`}
                     >
-                      <TableCell className="pl-5">
+                      <TableCell className="pl-4 sm:pl-5">
                         <div className="flex flex-col">
-                          <span className="text-sm font-bold text-foreground font-mono">
+                          <span className="text-xs sm:text-sm font-bold text-foreground font-mono">
                             {h.symbol}
                           </span>
                           <span className="text-xs text-muted-foreground">
@@ -215,15 +216,15 @@ export default function PortfolioPage() {
                       <TableCell>
                         <CategoryBadge category={h.category} />
                       </TableCell>
-                      <TableCell className="text-right text-sm text-foreground tabular-nums">
+                      <TableCell className="text-right text-xs sm:text-sm text-foreground tabular-nums whitespace-nowrap">
                         {formatNumber(h.quantity, 4)}
                       </TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground tabular-nums">
+                      <TableCell className="text-right text-xs sm:text-sm text-muted-foreground tabular-nums whitespace-nowrap">
                         {formatCurrency(h.avgCostInBase, baseCurrency)}
                       </TableCell>
-                      <TableCell className="text-right text-sm text-foreground tabular-nums">
+                      <TableCell className="text-right text-xs sm:text-sm text-foreground tabular-nums">
                         <div className="flex flex-col items-end">
-                          <span>
+                          <span className="whitespace-nowrap">
                             {formatCurrency(h.currentPrice, livePriceCurrency)}
                           </span>
                           <span className="text-[10px] text-muted-foreground flex items-center gap-1">
@@ -236,14 +237,14 @@ export default function PortfolioPage() {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right text-sm font-semibold text-foreground tabular-nums">
+                      <TableCell className="text-right text-xs sm:text-sm font-semibold text-foreground tabular-nums whitespace-nowrap">
                         {formatCurrency(h.totalValueInBase, baseCurrency)}
                       </TableCell>
-                      <TableCell className="text-right pr-5">
+                      <TableCell className="text-right pr-4 sm:pr-5">
                         <div
                           className={`flex flex-col items-end ${isPositive ? "text-fin-green" : "text-fin-red"}`}
                         >
-                          <span className="text-sm font-medium flex items-center gap-1">
+                          <span className="text-xs sm:text-sm font-medium flex items-center gap-1 whitespace-nowrap">
                             {isPositive ? (
                               <TrendingUp className="w-3 h-3" />
                             ) : (

@@ -22,6 +22,14 @@ export interface AddTransactionInput {
   'txType' : TxType,
   'price' : number,
 }
+export interface AssetImport {
+  'name' : string,
+  'note' : string,
+  'currency' : string,
+  'category' : Category,
+  'manualPrice' : number,
+  'symbol' : string,
+}
 export type Category = { 'Stock' : null } |
   { 'RealEstate' : null } |
   { 'Cash' : null } |
@@ -42,10 +50,26 @@ export interface Holding {
   'gainLossPercent' : number,
   'symbol' : string,
 }
+export interface ImportResult {
+  'assetsSkipped' : bigint,
+  'assetsImported' : bigint,
+  'transactionsImported' : bigint,
+}
 export interface MetalPrice {
   'currency' : string,
   'timestamp' : bigint,
   'price' : number,
+}
+export interface PortfolioExport {
+  'assets' : Array<Public__1>,
+  'snapshots' : Array<Public__2>,
+  'exportedAt' : bigint,
+  'transactions' : Array<Public__3>,
+  'profile' : [] | [Public],
+}
+export interface PortfolioImportInput {
+  'assets' : Array<AssetImport>,
+  'transactions' : Array<TransactionImport>,
 }
 export interface PortfolioSnapshot {
   'id' : bigint,
@@ -79,6 +103,24 @@ export interface Public__1 {
   'manualPrice' : number,
   'symbol' : string,
 }
+export interface Public__2 {
+  'id' : bigint,
+  'totalValue' : number,
+  'date' : bigint,
+  'createdAt' : bigint,
+}
+export interface Public__3 {
+  'id' : bigint,
+  'fee' : number,
+  'assetId' : bigint,
+  'date' : bigint,
+  'note' : string,
+  'createdAt' : bigint,
+  'currency' : string,
+  'quantity' : number,
+  'txType' : TxType,
+  'price' : number,
+}
 export interface StockPrice {
   'ok' : boolean,
   'change24h' : number,
@@ -97,6 +139,16 @@ export interface Transaction {
   'date' : bigint,
   'note' : string,
   'createdAt' : bigint,
+  'currency' : string,
+  'quantity' : number,
+  'txType' : TxType,
+  'price' : number,
+}
+export interface TransactionImport {
+  'fee' : number,
+  'assetId' : bigint,
+  'date' : bigint,
+  'note' : string,
   'currency' : string,
   'quantity' : number,
   'txType' : TxType,
@@ -132,6 +184,7 @@ export interface _SERVICE {
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'deleteAsset' : ActorMethod<[bigint], undefined>,
   'deleteTransaction' : ActorMethod<[bigint], undefined>,
+  'exportPortfolioData' : ActorMethod<[], PortfolioExport>,
   'getAsset' : ActorMethod<[bigint], [] | [Public__1]>,
   'getAssets' : ActorMethod<[], Array<Public__1>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [Public]>,
@@ -149,6 +202,7 @@ export interface _SERVICE {
   'getTransaction' : ActorMethod<[bigint], [] | [Transaction]>,
   'getTransactions' : ActorMethod<[], Array<Transaction>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [Public]>,
+  'importPortfolioData' : ActorMethod<[PortfolioImportInput], ImportResult>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
   'saveCallerUserProfile' : ActorMethod<[Public], undefined>,
   'searchStocks' : ActorMethod<[string], Array<StockSearchResult>>,

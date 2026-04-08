@@ -2,6 +2,14 @@ import i18n from "i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 import { initReactI18next } from "react-i18next";
 
+// Migrate old localStorage key to new key
+const OLD_LANG_KEY = "finfolio-lang";
+const NEW_LANG_KEY = "miinsolio-lang";
+if (localStorage.getItem(OLD_LANG_KEY) && !localStorage.getItem(NEW_LANG_KEY)) {
+  localStorage.setItem(NEW_LANG_KEY, localStorage.getItem(OLD_LANG_KEY)!);
+  localStorage.removeItem(OLD_LANG_KEY);
+}
+
 const en = {
   common: {
     save: "Save Changes",
@@ -83,6 +91,9 @@ const en = {
     Cash: "Cash",
     Commodity: "Commodity",
     RealEstate: "Real Estate",
+    Bond: "Bond",
+    Fund: "Fund",
+    Savings: "Savings",
     Buy: "Buy",
     Sell: "Sell",
     Deposit: "Deposit",
@@ -101,6 +112,8 @@ const en = {
     assetAllocation: "Asset Allocation",
     noAssetsYet: "No assets yet.",
     total: "Total",
+    categoryBreakdown: "Detailed Category Breakdown",
+    categoryBreakdownDesc: "Individual asset distribution within each category",
     recentTransactions: "Recent Transactions",
     noTransactionsYet: "No transactions yet",
     noTransactionsDesc:
@@ -244,18 +257,27 @@ const en = {
     autoFree: "Auto • Free",
     priceDataNote:
       "All prices are fetched automatically every 30 seconds. Stocks and commodities (metals + oil) all use Yahoo Finance — no API key required.",
-    aboutTitle: "About FinFolio",
+    aboutTitle: "About Miinsolio",
     version: "Version 1.0.0",
     aboutDesc1: "Decentralized portfolio management on the Internet Computer.",
     aboutDesc2:
       "Track stocks, crypto, forex, commodities, and more in one place.",
     profileSaved: "Profile saved successfully",
     profileFailed: "Failed to save profile",
+    dataManagement: "Data Management",
+    exportPortfolio: "Export Portfolio",
+    exportDescription:
+      "Download all your assets and transactions as a JSON file",
+    importPortfolio: "Import Portfolio",
+    importDescription: "Import a portfolio from a JSON backup file",
+    importSuccess: "Imported {{assets}} assets, {{transactions}} transactions",
+    importError: "Failed to import portfolio",
+    exportSuccess: "Portfolio exported successfully",
   },
   profile: {
     setupTitle: "Set up your profile",
     setupSubtitle:
-      "Welcome to FinFolio! Tell us a bit about yourself to get started.",
+      "Welcome to Miinsolio! Tell us a bit about yourself to get started.",
     displayNameLabel: "Display Name",
     displayNamePlaceholder: "e.g. Alex Nguyen",
     baseCurrencyLabel: "Base Currency",
@@ -350,6 +372,9 @@ const vi: typeof en = {
     Cash: "Tiền mặt",
     Commodity: "Hàng hóa",
     RealEstate: "Bất động sản",
+    Bond: "Trái phiếu",
+    Fund: "Quỹ đầu tư",
+    Savings: "Tiết kiệm",
     Buy: "Mua",
     Sell: "Bán",
     Deposit: "Nạp",
@@ -368,6 +393,8 @@ const vi: typeof en = {
     assetAllocation: "Phân bổ tài sản",
     noAssetsYet: "Chưa có tài sản.",
     total: "Tổng",
+    categoryBreakdown: "Phân tích chi tiết theo danh mục",
+    categoryBreakdownDesc: "Phân bổ tài sản riêng lẻ trong mỗi danh mục",
     recentTransactions: "Giao dịch gần đây",
     noTransactionsYet: "Chưa có giao dịch",
     noTransactionsDesc: "Thêm giao dịch đầu tiên để bắt đầu theo dõi danh mục.",
@@ -508,18 +535,26 @@ const vi: typeof en = {
     autoFree: "Tự động • Miễn phí",
     priceDataNote:
       "Tất cả giá được lấy tự động mỗi 30 giây. Cổ phiếu và hàng hóa (kim loại + dầu) đều dùng Yahoo Finance — không cần API key.",
-    aboutTitle: "Về FinFolio",
+    aboutTitle: "Về Miinsolio",
     version: "Phiên bản 1.0.0",
     aboutDesc1: "Quản lý danh mục phi tập trung trên Internet Computer.",
     aboutDesc2:
       "Theo dõi cổ phiếu, crypto, ngoại tệ, hàng hóa và nhiều hơn nữa.",
     profileSaved: "Đã lưu hồ sơ thành công",
     profileFailed: "Lưu hồ sơ thất bại",
+    dataManagement: "Quản lý dữ liệu",
+    exportPortfolio: "Xuất danh mục",
+    exportDescription: "Tải toàn bộ tài sản và giao dịch dưới dạng JSON",
+    importPortfolio: "Nhập danh mục",
+    importDescription: "Nhập danh mục từ file JSON sao lưu",
+    importSuccess: "Đã nhập {{assets}} tài sản, {{transactions}} giao dịch",
+    importError: "Không thể nhập danh mục",
+    exportSuccess: "Xuất danh mục thành công",
   },
   profile: {
     setupTitle: "Thiết lập hồ sơ",
     setupSubtitle:
-      "Chào mừng đến với FinFolio! Hãy cho chúng tôi biết thêm về bạn để bắt đầu.",
+      "Chào mừng đến với Miinsolio! Hãy cho chúng tôi biết thêm về bạn để bắt đầu.",
     displayNameLabel: "Tên hiển thị",
     displayNamePlaceholder: "vd. Nguyễn Văn An",
     baseCurrencyLabel: "Tiền tệ cơ sở",
@@ -542,7 +577,7 @@ i18n
     supportedLngs: ["en", "vi"],
     detection: {
       order: ["localStorage", "navigator"],
-      lookupLocalStorage: "finfolio-lang",
+      lookupLocalStorage: "miinsolio-lang",
       caches: ["localStorage"],
     },
     interpolation: { escapeValue: false },

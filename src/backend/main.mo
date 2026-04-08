@@ -181,6 +181,48 @@ actor {
     createdAt : Int;
   };
 
+  // Portfolio export/import types
+  type PortfolioExport = {
+    assets : [Asset.Public];
+    transactions : [Transaction.Public];
+    snapshots : [PortfolioSnapshot.Public];
+    profile : ?UserProfile.Public;
+    exportedAt : Int;
+  };
+
+  // Asset import omits id and createdAt (assigned server-side)
+  type AssetImport = {
+    symbol : Text;
+    name : Text;
+    category : Asset.Category;
+    currency : Text;
+    manualPrice : Float;
+    note : Text;
+  };
+
+  // Transaction import omits id and createdAt; assetId references the old asset id from export
+  type TransactionImport = {
+    assetId : Nat; // old asset id — will be remapped during import
+    txType : Transaction.TxType;
+    quantity : Float;
+    price : Float;
+    currency : Text;
+    fee : Float;
+    date : Int;
+    note : Text;
+  };
+
+  type PortfolioImportInput = {
+    assets : [AssetImport];
+    transactions : [TransactionImport];
+  };
+
+  type ImportResult = {
+    assetsImported : Nat;
+    assetsSkipped : Nat;
+    transactionsImported : Nat;
+  };
+
   // State
   let assets = Map.empty<Principal, Map.Map<Nat, Asset.Public>>();
   let transactions = Map.empty<Principal, Map.Map<Nat, Transaction>>();
@@ -197,8 +239,8 @@ actor {
   let exchangeRateCacheTtl : Int = 30 * 60 * 1_000_000_000;
 
   // Legacy stable vars kept for backward-compatibility (migration from single-symbol cache)
-  var metalPriceCache : ?MetalPrice = null;
-  var metalPriceCacheTime : Int = 0;
+  var _metalPriceCache : ?MetalPrice = null;
+  var _metalPriceCacheTime : Int = 0;
 
   // Metal price cache per symbol (e.g. XAU, XAG, XPT, XPD)
   let metalPriceCacheMap = Map.empty<Text, MetalPrice>();
@@ -1229,6 +1271,127 @@ actor {
       totalGainLossPercent = gainLossPercent;
       dailyChange = 0.0;
       allocation;
+    };
+  };
+
+  // -------------------------------------------------------
+  // Portfolio Export
+  // Returns all caller data as a portable snapshot
+  // -------------------------------------------------------
+  public query ({ caller }) func exportPortfolioData() : async PortfolioExport {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can export portfolio");
+    };
+    let callerAssets = getCallerAssets(caller).values().toArray().sort();
+    let callerTxs = getCallerTransactions(caller).values().toArray().sort();
+    let callerSnaps = getCallerSnapshots(caller).values().toArray().sort();
+    let callerProfile = userProfiles.get(caller);
+    {
+      assets = callerAssets;
+      transactions = callerTxs;
+      snapshots = callerSnaps;
+      profile = callerProfile;
+      exportedAt = Time.now();
+    };
+  };
+
+  // -------------------------------------------------------
+  // Portfolio Import
+  // Merges assets and transactions into caller's data.
+  // Assets are deduplicated by symbol+category.
+  // Transactions are always appended (no dedup).
+  // -------------------------------------------------------
+  public shared ({ caller }) func importPortfolioData(data : PortfolioImportInput) : async ImportResult {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can import portfolio");
+    };
+    let userAssets = getCallerAssets(caller);
+    let userTxs = getCallerTransactions(caller);
+    let now = Time.now();
+
+    // Map old asset id → new asset id
+    let idMap = Map.empty<Nat, Nat>();
+    var assetsImported : Nat = 0;
+    var assetsSkipped : Nat = 0;
+    var txImported : Nat = 0;
+
+    // Process assets with index so we can track old id by position
+    var assetIdx : Nat = 0;
+    for (importAsset in data.assets.values()) {
+      // Use index as the "old id" key (import input has no id field)
+      let oldId = assetIdx;
+      assetIdx += 1;
+
+      // Check if symbol+category already exists for caller
+      let existing = userAssets.values().find(
+        func(a) {
+          a.symbol == importAsset.symbol and a.category == importAsset.category;
+        }
+      );
+      switch (existing) {
+        case (?found) {
+          // Already exists — map old index to existing id, skip creation
+          idMap.add(oldId, found.id);
+          assetsSkipped += 1;
+        };
+        case (null) {
+          // New asset — create it
+          let newId = nextAssetId;
+          nextAssetId += 1;
+          let newAsset : Asset.Public = {
+            id = newId;
+            symbol = importAsset.symbol;
+            name = importAsset.name;
+            category = importAsset.category;
+            currency = importAsset.currency;
+            manualPrice = importAsset.manualPrice;
+            note = importAsset.note;
+            createdAt = now;
+          };
+          userAssets.add(newId, newAsset);
+          idMap.add(oldId, newId);
+          assetsImported += 1;
+        };
+      };
+    };
+    assets.add(caller, userAssets);
+
+    // Process transactions — remap assetId via idMap, skip orphans
+    for (importTx in data.transactions.values()) {
+      switch (idMap.get(importTx.assetId)) {
+        case (null) {}; // orphan — old assetId not in export, skip
+        case (?remappedAssetId) {
+          let txId = nextTransactionId;
+          nextTransactionId += 1;
+          let resolvedCurrency = if (importTx.currency == "") {
+            switch (userAssets.get(remappedAssetId)) {
+              case (?a) { a.currency };
+              case (null) { "USD" };
+            };
+          } else { importTx.currency };
+          let newTx : Transaction = {
+            id = txId;
+            assetId = remappedAssetId;
+            txType = importTx.txType;
+            quantity = importTx.quantity;
+            price = importTx.price;
+            currency = resolvedCurrency;
+            fee = importTx.fee;
+            date = importTx.date;
+            note = importTx.note;
+            createdAt = now;
+          };
+          userTxs.add(txId, newTx);
+          txImported += 1;
+        };
+      };
+    };
+    transactions.add(caller, userTxs);
+
+    {
+      assetsImported;
+      assetsSkipped;
+      transactionsImported = txImported;
     };
   };
 

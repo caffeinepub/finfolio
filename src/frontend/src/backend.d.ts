@@ -7,10 +7,30 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
+export interface Public__2 {
+    id: bigint;
+    totalValue: number;
+    date: bigint;
+    createdAt: bigint;
+}
 export interface TransformationOutput {
     status: bigint;
     body: Uint8Array;
     headers: Array<http_header>;
+}
+export interface TransactionImport {
+    fee: number;
+    assetId: bigint;
+    date: bigint;
+    note: string;
+    currency: string;
+    quantity: number;
+    txType: TxType;
+    price: number;
+}
+export interface PortfolioImportInput {
+    assets: Array<AssetImport>;
+    transactions: Array<TransactionImport>;
 }
 export interface PortfolioSummary {
     totalValue: number;
@@ -29,11 +49,30 @@ export interface StockSearchResult {
     exchange: string;
     symbol: string;
 }
+export interface Public__3 {
+    id: bigint;
+    fee: number;
+    assetId: bigint;
+    date: bigint;
+    note: string;
+    createdAt: bigint;
+    currency: string;
+    quantity: number;
+    txType: TxType;
+    price: number;
+}
 export interface Public {
     baseCurrency: string;
     displayName: string;
     createdAt: bigint;
     user: Principal;
+}
+export interface PortfolioExport {
+    assets: Array<Public__1>;
+    snapshots: Array<Public__2>;
+    exportedAt: bigint;
+    transactions: Array<Public__3>;
+    profile?: Public;
 }
 export interface MetalPrice {
     currency: string;
@@ -43,11 +82,6 @@ export interface MetalPrice {
 export interface http_header {
     value: string;
     name: string;
-}
-export interface http_request_result {
-    status: bigint;
-    body: Uint8Array;
-    headers: Array<http_header>;
 }
 export interface Transaction {
     id: bigint;
@@ -60,6 +94,16 @@ export interface Transaction {
     quantity: number;
     txType: TxType;
     price: number;
+}
+export interface http_request_result {
+    status: bigint;
+    body: Uint8Array;
+    headers: Array<http_header>;
+}
+export interface ImportResult {
+    assetsSkipped: bigint;
+    assetsImported: bigint;
+    transactionsImported: bigint;
 }
 export interface StockPrice {
     ok: boolean;
@@ -113,6 +157,14 @@ export interface AddTransactionInput {
     txType: TxType;
     price: number;
 }
+export interface AssetImport {
+    name: string;
+    note: string;
+    currency: string;
+    category: Category;
+    manualPrice: number;
+    symbol: string;
+}
 export enum Category {
     Stock = "Stock",
     RealEstate = "RealEstate",
@@ -139,6 +191,7 @@ export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     deleteAsset(id: bigint): Promise<void>;
     deleteTransaction(id: bigint): Promise<void>;
+    exportPortfolioData(): Promise<PortfolioExport>;
     getAsset(id: bigint): Promise<Public__1 | null>;
     getAssets(): Promise<Array<Public__1>>;
     getCallerUserProfile(): Promise<Public | null>;
@@ -156,6 +209,7 @@ export interface backendInterface {
     getTransaction(id: bigint): Promise<Transaction | null>;
     getTransactions(): Promise<Array<Transaction>>;
     getUserProfile(user: Principal): Promise<Public | null>;
+    importPortfolioData(data: PortfolioImportInput): Promise<ImportResult>;
     isCallerAdmin(): Promise<boolean>;
     saveCallerUserProfile(profile: Public): Promise<void>;
     searchStocks(searchTerm: string): Promise<Array<StockSearchResult>>;

@@ -1,0 +1,23 @@
+{
+  "overview": "Miinsolio is a portfolio management app for tracking stocks, crypto, forex, commodities, real estate and more — with real-time prices, multi-currency support, and full Vietnamese/English language support.",
+  "features": [
+    "Track stocks, crypto, forex, commodities, and real estate",
+    "Real-time price feeds (Yahoo Finance, CoinGecko, Frankfurter)",
+    "Import and export full portfolio as JSON for account migration",
+    "Multi-language support (English and Vietnamese)",
+    "Transaction history with buy/sell/deposit/withdraw tracking",
+    "Portfolio performance charts and KPI statistics",
+    "Auto currency conversion to VND"
+  ],
+  "category": "finance",
+  "tags": [
+    "portfolio",
+    "investment",
+    "finance",
+    "stocks",
+    "crypto",
+    "vietnamese",
+    "tracking"
+  ],
+  "last_updated": "2026-04-08T11:25:58.999Z"
+}

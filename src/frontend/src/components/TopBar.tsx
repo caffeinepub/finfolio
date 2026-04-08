@@ -1,12 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useGetProfile } from "@/hooks/useQueries";
-import { Bell, ChevronDown, Search } from "lucide-react";
+import { Bell, ChevronDown, Menu, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 interface Props {
   dateRange: string;
   onDateRangeChange: (range: string) => void;
+  onToggleSidebar?: () => void;
 }
 
 const DATE_RANGE_KEYS = [
@@ -17,7 +18,11 @@ const DATE_RANGE_KEYS = [
   "All Time",
 ] as const;
 
-export default function TopBar({ dateRange, onDateRangeChange }: Props) {
+export default function TopBar({
+  dateRange,
+  onDateRangeChange,
+  onToggleSidebar,
+}: Props) {
   const { data: profile } = useGetProfile();
   const { t, i18n } = useTranslation();
   const displayName = profile?.displayName || "there";
@@ -29,23 +34,39 @@ export default function TopBar({ dateRange, onDateRangeChange }: Props) {
   };
 
   return (
-    <header className="flex items-center justify-between mb-8">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">
-          {t("topbar.greeting")}{" "}
-          <span className="text-fin-green">{displayName}</span>!
-        </h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          {t("topbar.subtitle")}
-        </p>
+    <header className="flex items-start justify-between mb-6 sm:mb-8 gap-3">
+      {/* Left: hamburger (mobile/tablet) + greeting */}
+      <div className="flex items-start gap-3 min-w-0">
+        {/* Hamburger — only on < lg */}
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          aria-label="Open navigation menu"
+          data-ocid="topbar.hamburger.button"
+          className="lg:hidden flex-shrink-0 mt-1 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground leading-tight">
+            {t("topbar.greeting")}{" "}
+            <span className="text-fin-green">{displayName}</span>!
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            {t("topbar.subtitle")}
+          </p>
+        </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      {/* Right: search, lang, bell, date range */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {/* Search — hidden on mobile */}
         <div className="relative hidden md:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder={t("topbar.searchPlaceholder")}
-            className="pl-9 w-52 bg-muted border-border text-sm h-9"
+            className="pl-9 w-44 lg:w-52 bg-muted border-border text-sm h-9"
             data-ocid="topbar.search_input"
           />
         </div>
@@ -76,7 +97,8 @@ export default function TopBar({ dateRange, onDateRangeChange }: Props) {
           <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-fin-green" />
         </Button>
 
-        <div className="relative">
+        {/* Date range — hidden on mobile (< sm), visible sm+ */}
+        <div className="relative hidden sm:block">
           <select
             value={dateRange}
             onChange={(e) => onDateRangeChange(e.target.value)}

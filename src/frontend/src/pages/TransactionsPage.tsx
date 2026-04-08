@@ -276,9 +276,10 @@ export default function TransactionsPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">
+      {/* Page header — flex-wrap on mobile */}
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-4 sm:mb-6">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">
             {t("transactions.title")}
           </h1>
           <p className="text-muted-foreground text-sm mt-0.5">
@@ -287,15 +288,15 @@ export default function TransactionsPage() {
         </div>
         <Button
           onClick={openAdd}
-          className="bg-fin-green text-background hover:bg-fin-green/90 gap-2"
+          className="bg-fin-green text-background hover:bg-fin-green/90 gap-2 min-h-[44px] shrink-0"
           data-ocid="transactions.add_button"
         >
           <Plus className="w-4 h-4" /> {t("transactions.addTransaction")}
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-2 mb-4 flex-wrap">
+      {/* Filters — wrap nicely on mobile */}
+      <div className="flex gap-2 mb-4 flex-wrap items-center">
         {["All", TxType.Buy, TxType.Sell, TxType.Deposit, TxType.Withdraw].map(
           (type) => (
             <button
@@ -303,7 +304,7 @@ export default function TransactionsPage() {
               key={type}
               onClick={() => setFilterType(type)}
               data-ocid="transactions.filter.tab"
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              className={`px-3 py-2 min-h-[36px] rounded-full text-xs font-medium transition-colors ${
                 filterType === type
                   ? "bg-fin-green/20 text-fin-green border border-fin-green/30"
                   : "bg-muted text-muted-foreground border border-transparent hover:text-foreground"
@@ -318,7 +319,7 @@ export default function TransactionsPage() {
           <select
             value={filterAsset}
             onChange={(e) => setFilterAsset(e.target.value)}
-            className="h-8 px-2 rounded-full bg-muted border border-transparent text-xs text-muted-foreground focus:outline-none focus:border-fin-green/30"
+            className="h-9 px-2 rounded-full bg-muted border border-transparent text-xs text-muted-foreground focus:outline-none focus:border-fin-green/30"
             data-ocid="transactions.asset.select"
           >
             <option value="all">{t("common.allAssets")}</option>
@@ -355,11 +356,11 @@ export default function TransactionsPage() {
             />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="overflow-x-auto w-full rounded-lg">
+            <Table className="min-w-[700px]">
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="text-muted-foreground text-xs pl-5">
+                  <TableHead className="text-muted-foreground text-xs pl-4 sm:pl-5">
                     {t("transactions.dateCol")}
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs">
@@ -383,7 +384,7 @@ export default function TransactionsPage() {
                   <TableHead className="text-muted-foreground text-xs">
                     {t("transactions.noteCol")}
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right pr-5">
+                  <TableHead className="text-muted-foreground text-xs text-right pr-4 sm:pr-5">
                     {t("transactions.actionsCol")}
                   </TableHead>
                 </TableRow>
@@ -401,13 +402,13 @@ export default function TransactionsPage() {
                       className="border-border hover:bg-muted/30"
                       data-ocid={`transactions.item.${i + 1}`}
                     >
-                      <TableCell className="pl-5 text-xs text-muted-foreground">
+                      <TableCell className="pl-4 sm:pl-5 text-xs text-muted-foreground whitespace-nowrap">
                         {formatDate(tx.date)}
                       </TableCell>
                       <TableCell>
                         <TxTypeBadge txType={tx.txType} />
                       </TableCell>
-                      <TableCell className="text-sm font-bold font-mono text-foreground">
+                      <TableCell className="text-xs sm:text-sm font-bold font-mono text-foreground">
                         <div className="flex flex-col">
                           <span>{symbol}</span>
                           {txCurrency !== "USD" && (
@@ -417,45 +418,47 @@ export default function TransactionsPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right text-sm text-foreground tabular-nums">
+                      <TableCell className="text-right text-xs sm:text-sm text-foreground tabular-nums">
                         {tx.quantity.toLocaleString(undefined, {
                           maximumFractionDigits: 6,
                         })}
                       </TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground tabular-nums">
+                      <TableCell className="text-right text-xs sm:text-sm text-muted-foreground tabular-nums whitespace-nowrap">
                         {formatCurrency(tx.price, txCurrency)}
                       </TableCell>
-                      <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
+                      <TableCell className="text-right text-xs text-muted-foreground tabular-nums whitespace-nowrap">
                         {formatCurrency(tx.fee, txCurrency)}
                       </TableCell>
                       <TableCell
-                        className={`text-right text-sm font-medium tabular-nums ${
+                        className={`text-right text-xs sm:text-sm font-medium tabular-nums whitespace-nowrap ${
                           isBuyOrDeposit ? "text-fin-green" : "text-fin-red"
                         }`}
                       >
                         {isBuyOrDeposit ? "+" : "-"}
                         {formatCurrency(amount, txCurrency)}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">
+                      <TableCell className="text-xs text-muted-foreground max-w-[100px] truncate">
                         {tx.note || "—"}
                       </TableCell>
-                      <TableCell className="text-right pr-5">
+                      <TableCell className="text-right pr-4 sm:pr-5">
                         <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-yellow-400 transition-colors"
+                            className="h-8 w-8 sm:h-7 sm:w-7 text-muted-foreground hover:text-yellow-400 transition-colors"
                             onClick={() => openEdit(tx)}
                             data-ocid={`transactions.edit_button.${i + 1}`}
+                            aria-label={t("transactions.editTransaction")}
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-fin-red transition-colors"
+                            className="h-8 w-8 sm:h-7 sm:w-7 text-muted-foreground hover:text-fin-red transition-colors"
                             onClick={() => setDeleteTarget(tx)}
                             data-ocid={`transactions.delete_button.${i + 1}`}
+                            aria-label={t("common.delete")}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
@@ -473,7 +476,7 @@ export default function TransactionsPage() {
       {/* Add Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
-          className="bg-card border-border max-w-md"
+          className="bg-card border-border w-full max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[90vh] overflow-y-auto"
           data-ocid="transactions.dialog"
         >
           <DialogHeader>
@@ -624,12 +627,12 @@ export default function TransactionsPage() {
                 data-ocid="transactions.note.input"
               />
             </div>
-            <DialogFooter>
+            <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => setDialogOpen(false)}
-                className="text-muted-foreground"
+                className="text-muted-foreground w-full sm:w-auto"
                 data-ocid="transactions.cancel_button"
               >
                 {t("common.cancel")}
@@ -637,7 +640,7 @@ export default function TransactionsPage() {
               <Button
                 type="submit"
                 disabled={addTransaction.isPending}
-                className="bg-fin-green text-background hover:bg-fin-green/90"
+                className="bg-fin-green text-background hover:bg-fin-green/90 w-full sm:w-auto"
                 data-ocid="transactions.submit_button"
               >
                 {addTransaction.isPending
@@ -655,7 +658,7 @@ export default function TransactionsPage() {
         onOpenChange={(o) => !o && closeEdit()}
       >
         <DialogContent
-          className="bg-card border-border max-w-md"
+          className="bg-card border-border w-full max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[90vh] overflow-y-auto"
           data-ocid="transactions.edit_dialog"
         >
           <DialogHeader>
@@ -807,12 +810,12 @@ export default function TransactionsPage() {
               />
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
               <Button
                 type="button"
                 variant="ghost"
                 onClick={closeEdit}
-                className="text-muted-foreground"
+                className="text-muted-foreground w-full sm:w-auto"
                 data-ocid="transactions.edit.cancel_button"
               >
                 {t("transactions.cancelBtn")}
@@ -820,7 +823,7 @@ export default function TransactionsPage() {
               <Button
                 type="submit"
                 disabled={updateTransaction.isPending}
-                className="bg-fin-green text-background hover:bg-fin-green/90"
+                className="bg-fin-green text-background hover:bg-fin-green/90 w-full sm:w-auto"
                 data-ocid="transactions.edit.submit_button"
               >
                 {updateTransaction.isPending
@@ -837,7 +840,7 @@ export default function TransactionsPage() {
         open={!!deleteTarget}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
       >
-        <AlertDialogContent className="bg-card border-border">
+        <AlertDialogContent className="bg-card border-border w-full max-w-[calc(100vw-2rem)] sm:max-w-sm">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground">
               {t("transactions.deleteTitle")}

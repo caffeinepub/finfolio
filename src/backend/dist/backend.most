@@ -54,6 +54,8 @@ type Transaction__865268250 = Public__786825652;
 type TxType__343382301 = {#Buy; #Deposit; #Sell; #Withdraw};
 type UserRole__1054455867 = {#admin; #guest; #user};
 actor {
+  stable var _metalPriceCache : ?MetalPrice__535972026;
+  stable var _metalPriceCacheTime : Int;
   stable accessControlState :
     {
       var adminAssigned : Bool;
@@ -68,13 +70,11 @@ actor {
   stable var exchangeRateCache : [(Text, Float)];
   stable var exchangeRateCacheTime : Int;
   stable exchangeRateCacheTtl : Int;
-  stable var metalPriceCache : ?MetalPrice__535972026;
   stable metalPriceCacheMap :
     {
       var root : Node__46230540<Text, MetalPrice__535972026>;
       var size : Nat__490723111
     };
-  stable var metalPriceCacheTime : Int;
   stable metalPriceCacheTimeMap :
     {var root : Node__46230540<Text, Int>; var size : Nat__490723111};
   stable metalPriceCacheTtl : Int;

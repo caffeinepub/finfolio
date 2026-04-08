@@ -33,6 +33,17 @@ type TransformationInput =
    context: blob;
    response: http_request_result;
  };
+type TransactionImport = 
+ record {
+   assetId: nat;
+   currency: text;
+   date: int;
+   fee: float64;
+   note: text;
+   price: float64;
+   quantity: float64;
+   txType: TxType;
+ };
 type Transaction = 
  record {
    assetId: nat;
@@ -58,6 +69,26 @@ type StockPrice =
    ok: bool;
    price: float64;
    symbol: text;
+ };
+type Public__3 = 
+ record {
+   assetId: nat;
+   createdAt: int;
+   currency: text;
+   date: int;
+   fee: float64;
+   id: nat;
+   note: text;
+   price: float64;
+   quantity: float64;
+   txType: TxType;
+ };
+type Public__2 = 
+ record {
+   createdAt: int;
+   date: int;
+   id: nat;
+   totalValue: float64;
  };
 type Public__1 = 
  record {
@@ -98,11 +129,30 @@ type PortfolioSnapshot =
    id: nat;
    totalValue: float64;
  };
+type PortfolioImportInput = 
+ record {
+   assets: vec AssetImport;
+   transactions: vec TransactionImport;
+ };
+type PortfolioExport = 
+ record {
+   assets: vec Public__1;
+   exportedAt: int;
+   profile: opt Public;
+   snapshots: vec Public__2;
+   transactions: vec Public__3;
+ };
 type MetalPrice = 
  record {
    currency: text;
    price: float64;
    timestamp: int;
+ };
+type ImportResult = 
+ record {
+   assetsImported: nat;
+   assetsSkipped: nat;
+   transactionsImported: nat;
  };
 type Holding = 
  record {
@@ -128,6 +178,15 @@ type Category =
    RealEstate;
    Stock;
  };
+type AssetImport = 
+ record {
+   category: Category;
+   currency: text;
+   manualPrice: float64;
+   name: text;
+   note: text;
+   symbol: text;
+ };
 type AddTransactionInput = 
  record {
    assetId: nat;
@@ -149,6 +208,7 @@ service : {
   assignCallerUserRole: (user: principal, role: UserRole) -> ();
   deleteAsset: (id: nat) -> ();
   deleteTransaction: (id: nat) -> ();
+  exportPortfolioData: () -> (PortfolioExport) query;
   getAsset: (id: nat) -> (opt Public__1) query;
   getAssets: () -> (vec Public__1) query;
   getCallerUserProfile: () -> (opt Public) query;
@@ -171,6 +231,7 @@ service : {
   getTransaction: (id: nat) -> (opt Transaction) query;
   getTransactions: () -> (vec Transaction) query;
   getUserProfile: (user: principal) -> (opt Public) query;
+  importPortfolioData: (data: PortfolioImportInput) -> (ImportResult);
   isCallerAdmin: () -> (bool) query;
   saveCallerUserProfile: (profile: Public) -> ();
   searchStocks: (searchTerm: text) -> (vec StockSearchResult);

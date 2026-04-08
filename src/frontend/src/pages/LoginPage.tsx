@@ -73,26 +73,26 @@ export default function LoginPage() {
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="relative z-10 w-full max-w-md"
+        className="relative z-10 w-full max-w-sm px-4 sm:px-0 sm:max-w-md"
       >
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-fin-green/20 flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-fin-green" />
+          <div className="inline-flex items-center gap-2 mb-3 sm:mb-4">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-fin-green/20 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-fin-green" />
             </div>
-            <span className="font-display text-2xl font-bold text-foreground">
-              FinFolio
+            <span className="font-display text-xl sm:text-2xl font-bold text-foreground">
+              Miinsolio
             </span>
           </div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
             {t("login.title")}
           </h1>
           <p className="text-muted-foreground">{t("login.subtitle")}</p>
         </div>
 
         {/* Card */}
-        <div className="bg-card border border-border rounded-2xl p-8 shadow-card">
+        <div className="bg-card border border-border rounded-2xl p-6 sm:p-8 shadow-card">
           <div className="space-y-4 mb-6">
             {features.map((item) => (
               <div key={item.titleKey} className="flex items-center gap-3">

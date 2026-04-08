@@ -11,6 +11,7 @@ import {
   LogOut,
   Settings,
   TrendingUp,
+  X,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
@@ -25,6 +26,8 @@ export type Page =
 interface Props {
   activePage: Page;
   onNavigate: (page: Page) => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 const navItems: { id: Page; icon: React.ElementType }[] = [
@@ -35,7 +38,12 @@ const navItems: { id: Page; icon: React.ElementType }[] = [
   { id: "settings", icon: Settings },
 ];
 
-export default function Sidebar({ activePage, onNavigate }: Props) {
+export default function Sidebar({
+  activePage,
+  onNavigate,
+  isOpen = false,
+  onClose,
+}: Props) {
   const { clear, identity } = useInternetIdentity();
   const qc = useQueryClient();
   const { data: profile } = useGetProfile();
@@ -53,23 +61,32 @@ export default function Sidebar({ activePage, onNavigate }: Props) {
       : "User");
   const initials = displayName
     .split(" ")
-    .map((w) => w[0])
+    .map((w: string) => w[0])
     .join("")
     .slice(0, 2)
     .toUpperCase();
 
-  return (
-    <aside className="fixed left-0 top-0 h-full w-60 bg-sidebar border-r border-sidebar-border flex flex-col z-30">
-      {/* Logo */}
-      <div className="px-5 pt-6 pb-4">
+  const sidebarContent = (
+    <>
+      {/* Logo row — on mobile shows close button */}
+      <div className="px-5 pt-6 pb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-fin-green/20 flex items-center justify-center">
             <TrendingUp className="w-4 h-4 text-fin-green" />
           </div>
           <span className="font-display text-xl font-bold text-foreground tracking-tight">
-            FinFolio
+            Miinsolio
           </span>
         </div>
+        {/* Close button — only visible on mobile/tablet */}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close sidebar"
+          className="lg:hidden p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Nav */}
@@ -135,6 +152,27 @@ export default function Sidebar({ activePage, onNavigate }: Props) {
           <span>{t("sidebar.logout")}</span>
         </button>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar — always visible on lg+ */}
+      <aside className="hidden lg:flex fixed left-0 top-0 h-full w-60 bg-sidebar border-r border-sidebar-border flex-col z-30">
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile/tablet drawer — slides in from left */}
+      <aside
+        className={cn(
+          "fixed left-0 top-0 h-full w-72 bg-sidebar border-r border-sidebar-border flex flex-col z-50",
+          "transition-transform duration-300 ease-in-out lg:hidden",
+          isOpen ? "translate-x-0" : "-translate-x-full",
+        )}
+        aria-label="Navigation menu"
+      >
+        {sidebarContent}
+      </aside>
+    </>
   );
 }
