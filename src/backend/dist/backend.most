@@ -1,6 +1,5 @@
 // Version: 1.0.0
-type Category__164941945 =
-  {#Cash; #Commodity; #Crypto; #Forex; #RealEstate; #Stock};
+type Category__164941945 = {#Cash; #Crypto; #Forex; #Stock};
 type Data__791452850<K, V> =
   {var count : Nat__490723111; kvs : [var ?(K, V)]};
 type Internal__8484328<K, V> =
@@ -10,8 +9,6 @@ type Map__158565046<K, V> = Map__297112838<K, V>;
 type Map__297112838<K, V> =
   {var root : Node__46230540<K, V>; var size : Nat__490723111};
 type Map__605269027<K, V> = Map__158565046<K, V>;
-type MetalPrice__535972026 =
-  {currency : Text; price : Float; timestamp : Int};
 type Nat__490723111 = Nat__920180692;
 type Nat__920180692 = Nat;
 type Node__46230540<K, V> =
@@ -54,8 +51,6 @@ type Transaction__865268250 = Public__786825652;
 type TxType__343382301 = {#Buy; #Deposit; #Sell; #Withdraw};
 type UserRole__1054455867 = {#admin; #guest; #user};
 actor {
-  stable var _metalPriceCache : ?MetalPrice__535972026;
-  stable var _metalPriceCacheTime : Int;
   stable accessControlState :
     {
       var adminAssigned : Bool;
@@ -70,14 +65,6 @@ actor {
   stable var exchangeRateCache : [(Text, Float)];
   stable var exchangeRateCacheTime : Int;
   stable exchangeRateCacheTtl : Int;
-  stable metalPriceCacheMap :
-    {
-      var root : Node__46230540<Text, MetalPrice__535972026>;
-      var size : Nat__490723111
-    };
-  stable metalPriceCacheTimeMap :
-    {var root : Node__46230540<Text, Int>; var size : Nat__490723111};
-  stable metalPriceCacheTtl : Int;
   stable var nextAssetId : Nat;
   stable var nextSnapshotId : Nat;
   stable var nextTransactionId : Nat;

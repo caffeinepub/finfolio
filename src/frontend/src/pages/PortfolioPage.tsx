@@ -9,7 +9,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { usePortfolioVisibilityContext } from "@/contexts/PortfolioVisibilityContext";
 import { usePrices } from "@/contexts/PriceFeedContext";
 import { useGetHoldings, useGetProfile } from "@/hooks/useQueries";
 import {
@@ -20,32 +19,40 @@ import {
 import { Briefcase, TrendingDown, TrendingUp } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo } from "react";
-import { useTranslation } from "react-i18next";
 
+/**
+ * Determine the native currency a live price is quoted in.
+ * - Crypto: CoinGecko always returns USD prices regardless of asset.currency
+ * - Forex:  Frankfurter returns the exchange rate vs USD (price IS the USD value of 1 unit)
+ * - Stock:  Yahoo Finance returns the price in the stock's native currency
+ *           (VNM.VN → VND, AAPL → USD)
+ * - Cash:   manualPrice is stored in asset.currency
+ */
 function getLivePriceCurrency(
   category: Category,
   assetCurrency: string,
   symbol: string,
 ): string {
-  if (category === Category.Crypto) return "USD";
-  if (category === Category.Forex) return "USD";
-  if (category === Category.Commodity) return "USD";
+  if (category === Category.Crypto) return "USD"; // CoinGecko always USD
+  if (category === Category.Forex) return "USD"; // rate is expressed as USD per 1 unit, handled separately
   if (category === Category.Stock) {
+    // Vietnamese stocks have .VN suffix → price is VND
     if (symbol.toUpperCase().endsWith(".VN")) return "VND";
+    // All other stocks → USD from Yahoo Finance
     return "USD";
   }
+  // Cash: value stored in asset currency
   return assetCurrency || "USD";
 }
 
 export default function PortfolioPage() {
-  const { t } = useTranslation();
   const { data: holdings, isLoading } = useGetHoldings();
   const { prices, convert } = usePrices();
   const { data: profile } = useGetProfile();
-  const { mask } = usePortfolioVisibilityContext();
 
   const baseCurrency = profile?.baseCurrency ?? "USD";
 
+  // Enrich holdings with live prices and convert ALL values to baseCurrency
   const enrichedHoldings = useMemo(() => {
     if (!holdings) return [];
     return holdings
@@ -56,26 +63,35 @@ export default function PortfolioPage() {
             ? liveEntry.price
             : h.currentPrice;
 
+        // Determine the currency the live price is actually quoted in
         const livePriceCurrency = getLivePriceCurrency(
           h.category,
           h.currency || "USD",
           h.symbol,
         );
 
+        // Total value in the live price's currency
         const totalValueInLiveCurrency = h.quantity * livePrice;
+
+        // Convert total value to baseCurrency using the correct source currency
         const totalValueInBase = convert(
           totalValueInLiveCurrency,
           livePriceCurrency,
           baseCurrency,
         );
 
+        // Cost basis: transactions were recorded in asset.currency
+        // (the currency user selected when adding transactions)
         const assetCurrency = h.currency || "USD";
         const totalCostInBase = convert(
           h.totalCost,
           assetCurrency,
           baseCurrency,
         );
+
+        // Avg cost per unit in baseCurrency
         const avgCostInBase = h.quantity > 0 ? totalCostInBase / h.quantity : 0;
+
         const gainLossInBase = totalValueInBase - totalCostInBase;
         const gainLossPercent =
           totalCostInBase > 0 ? (gainLossInBase / totalCostInBase) * 100 : 0;
@@ -84,6 +100,7 @@ export default function PortfolioPage() {
           ...h,
           currentPrice: livePrice,
           livePriceCurrency,
+          // baseCurrency converted values — all display columns use these
           totalValueInBase,
           totalCostInBase,
           avgCostInBase,
@@ -119,30 +136,26 @@ export default function PortfolioPage() {
       transition={{ duration: 0.4 }}
       className="space-y-4"
     >
-      {/* Page header — responsive flex */}
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-4 sm:mb-6">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground">
-            {t("portfolio.title")}
-          </h1>
+          <h1 className="text-2xl font-bold text-foreground">Portfolio</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            {t("portfolio.subtitle")}
+            Your current holdings and performance
           </p>
         </div>
         <div className="flex flex-col items-end gap-0.5">
           <span className="text-sm font-semibold text-foreground">
-            {mask(formatCurrency(totalPortfolioValue, baseCurrency))}
+            {formatCurrency(totalPortfolioValue, baseCurrency)}
           </span>
           <span
             className={`text-xs font-medium ${totalGainLoss >= 0 ? "text-fin-green" : "text-fin-red"}`}
           >
             {totalGainLoss >= 0 ? "+" : ""}
-            {mask(formatCurrency(totalGainLoss, baseCurrency))} (
+            {formatCurrency(totalGainLoss, baseCurrency)} (
             {formatPercent(totalGainLossPercent)})
           </span>
           <span className="text-xs text-muted-foreground">
-            {enrichedHoldings.length} {t("portfolio.holdings")} ·{" "}
-            {t("portfolio.livePrices")} · {baseCurrency}
+            {enrichedHoldings.length} holdings · live prices · {baseCurrency}
           </span>
         </div>
       </div>
@@ -155,36 +168,36 @@ export default function PortfolioPage() {
         ) : enrichedHoldings.length === 0 ? (
           <div className="p-6">
             <EmptyState
-              title={t("portfolio.noHoldingsYet")}
-              description={t("portfolio.noHoldingsDesc")}
+              title="No holdings yet"
+              description="Add assets and transactions to see your portfolio here."
               icon={Briefcase}
             />
           </div>
         ) : (
-          <div className="overflow-x-auto w-full rounded-lg">
-            <Table className="min-w-[380px]">
+          <div className="overflow-x-auto">
+            <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="text-muted-foreground text-xs pl-4 sm:pl-5 whitespace-nowrap">
-                    {t("portfolio.assetCol")}
+                  <TableHead className="text-muted-foreground text-xs pl-5">
+                    Asset
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs whitespace-nowrap hidden sm:table-cell">
-                    {t("portfolio.categoryCol")}
+                  <TableHead className="text-muted-foreground text-xs">
+                    Category
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right whitespace-nowrap">
-                    {t("portfolio.quantityCol")}
+                  <TableHead className="text-muted-foreground text-xs text-right">
+                    Quantity
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right whitespace-nowrap hidden sm:table-cell">
-                    {t("portfolio.avgCostCol")}
+                  <TableHead className="text-muted-foreground text-xs text-right">
+                    Avg Cost
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right whitespace-nowrap">
-                    {t("portfolio.livePriceCol")}
+                  <TableHead className="text-muted-foreground text-xs text-right">
+                    Live Price
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right whitespace-nowrap">
-                    {t("portfolio.valueCol")} ({baseCurrency})
+                  <TableHead className="text-muted-foreground text-xs text-right">
+                    Value ({baseCurrency})
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right pr-4 sm:pr-5 whitespace-nowrap">
-                    {t("portfolio.gainLossCol")} ({baseCurrency})
+                  <TableHead className="text-muted-foreground text-xs text-right pr-5">
+                    Gain/Loss ({baseCurrency})
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -193,6 +206,7 @@ export default function PortfolioPage() {
                   const isPositive = h.gainLossInBase >= 0;
                   const liveEntry = prices[h.symbol];
                   const isLive = liveEntry?.status === "live";
+                  // Show original price currency label when it differs from baseCurrency
                   const livePriceCurrency = h.livePriceCurrency;
                   const livePriceLabel =
                     livePriceCurrency.toUpperCase() !==
@@ -205,9 +219,9 @@ export default function PortfolioPage() {
                       className="border-border hover:bg-muted/30 transition-colors"
                       data-ocid={`portfolio.item.${i + 1}`}
                     >
-                      <TableCell className="pl-4 sm:pl-5">
+                      <TableCell className="pl-5">
                         <div className="flex flex-col">
-                          <span className="text-xs sm:text-sm font-bold text-foreground font-mono">
+                          <span className="text-sm font-bold text-foreground font-mono">
                             {h.symbol}
                           </span>
                           <span className="text-xs text-muted-foreground">
@@ -215,46 +229,46 @@ export default function PortfolioPage() {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="hidden sm:table-cell">
+                      <TableCell>
                         <CategoryBadge category={h.category} />
                       </TableCell>
-                      <TableCell className="text-right text-xs sm:text-sm text-foreground tabular-nums whitespace-nowrap">
+                      <TableCell className="text-right text-sm text-foreground tabular-nums">
                         {formatNumber(h.quantity, 4)}
                       </TableCell>
-                      <TableCell className="text-right text-xs sm:text-sm text-muted-foreground tabular-nums whitespace-nowrap hidden sm:table-cell">
-                        {mask(formatCurrency(h.avgCostInBase, baseCurrency))}
+                      {/* Avg Cost in baseCurrency */}
+                      <TableCell className="text-right text-sm text-muted-foreground tabular-nums">
+                        {formatCurrency(h.avgCostInBase, baseCurrency)}
                       </TableCell>
-                      <TableCell className="text-right text-xs sm:text-sm text-foreground tabular-nums">
+                      {/* Live Price in its native currency with label */}
+                      <TableCell className="text-right text-sm text-foreground tabular-nums">
                         <div className="flex flex-col items-end">
-                          <span className="whitespace-nowrap">
+                          <span>
                             {formatCurrency(h.currentPrice, livePriceCurrency)}
                           </span>
                           <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                             {livePriceLabel && <span>{livePriceLabel}</span>}
                             {isLive && (
-                              <span className="text-fin-green">
-                                {t("common.live")}
-                              </span>
+                              <span className="text-fin-green">live</span>
                             )}
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right text-xs sm:text-sm font-semibold text-foreground tabular-nums whitespace-nowrap">
-                        {mask(formatCurrency(h.totalValueInBase, baseCurrency))}
+                      {/* Total Value in baseCurrency */}
+                      <TableCell className="text-right text-sm font-semibold text-foreground tabular-nums">
+                        {formatCurrency(h.totalValueInBase, baseCurrency)}
                       </TableCell>
-                      <TableCell className="text-right pr-4 sm:pr-5">
+                      {/* Gain/Loss in baseCurrency */}
+                      <TableCell className="text-right pr-5">
                         <div
                           className={`flex flex-col items-end ${isPositive ? "text-fin-green" : "text-fin-red"}`}
                         >
-                          <span className="text-xs sm:text-sm font-medium flex items-center gap-1 whitespace-nowrap">
+                          <span className="text-sm font-medium flex items-center gap-1">
                             {isPositive ? (
                               <TrendingUp className="w-3 h-3" />
                             ) : (
                               <TrendingDown className="w-3 h-3" />
                             )}
-                            {mask(
-                              formatCurrency(h.gainLossInBase, baseCurrency),
-                            )}
+                            {formatCurrency(h.gainLossInBase, baseCurrency)}
                           </span>
                           <span className="text-xs opacity-80">
                             {formatPercent(h.gainLossPercent)}

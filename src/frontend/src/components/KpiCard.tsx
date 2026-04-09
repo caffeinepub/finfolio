@@ -35,24 +35,24 @@ export default function KpiCard({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.08, duration: 0.4 }}
-      className="bg-card border border-border rounded-xl p-3 sm:p-4 lg:p-5 shadow-card relative overflow-hidden"
+      className="bg-card border border-border rounded-xl p-5 shadow-card relative overflow-hidden"
     >
       {/* Subtle gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-transparent to-muted/20 pointer-events-none" />
 
       <div className="relative flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-xs sm:text-sm text-muted-foreground font-medium mb-1 truncate">
+          <p className="text-sm text-muted-foreground font-medium mb-1">
             {title}
           </p>
-          <p className="text-xl sm:text-2xl font-bold text-foreground tabular-nums">
+          <p className="text-2xl font-bold text-foreground tabular-nums">
             {value}
           </p>
 
           {delta !== undefined && (
             <div
               className={cn(
-                "flex items-center gap-1.5 mt-1.5 sm:mt-2 text-xs sm:text-sm font-medium flex-wrap",
+                "flex items-center gap-1.5 mt-2 text-sm font-medium",
                 neutral
                   ? "text-muted-foreground"
                   : isPositive
@@ -61,11 +61,11 @@ export default function KpiCard({
               )}
             >
               {neutral ? (
-                <Minus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                <Minus className="w-3.5 h-3.5" />
               ) : isPositive ? (
-                <TrendingUp className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                <TrendingUp className="w-3.5 h-3.5" />
               ) : (
-                <TrendingDown className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                <TrendingDown className="w-3.5 h-3.5" />
               )}
               <span>{formatPercent(delta)}</span>
               {deltaAmount && (
@@ -81,9 +81,9 @@ export default function KpiCard({
           )}
         </div>
 
-        {/* Sparkline — hidden on very small screens */}
+        {/* Sparkline */}
         {sparkline && sparkline.length > 0 && (
-          <div className="ml-2 sm:ml-3 hidden xs:block">
+          <div className="ml-3">
             <MiniSparkline data={sparkline} positive={isPositive !== false} />
           </div>
         )}

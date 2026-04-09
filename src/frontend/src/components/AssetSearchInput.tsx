@@ -1,17 +1,17 @@
 import { Category } from "@/backend.d";
 import { Input } from "@/components/ui/input";
-import { useActor } from "@/hooks/useActor";
+import { getActorFromCache } from "@/hooks/useQueries";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
 
 interface SearchResult {
-  symbol: string;
+  symbol: string; // stored ID (e.g. 'bitcoin' for crypto, 'VNM.VN' for VN stock, 'AAPL' for US stock)
   name: string;
-  displaySymbol?: string;
+  displaySymbol?: string; // shown in UI (e.g. 'BTC', 'VNM')
   price?: number;
-  exchange?: string;
-  isCustom?: boolean;
+  exchange?: string; // e.g. 'HOSE', 'HNX', 'NASDAQ'
+  isCustom?: boolean; // user-entered symbol not in static list
 }
 
 interface AssetSearchInputProps {
@@ -22,31 +22,7 @@ interface AssetSearchInputProps {
   onClear: () => void;
 }
 
-// ── Commodity list ────────────────────────────────────────────────────────────
-export const COMMODITY_LIST: SearchResult[] = [
-  { symbol: "XAU", name: "Gold", displaySymbol: "XAU" },
-  { symbol: "XAG", name: "Silver", displaySymbol: "XAG" },
-  { symbol: "XPT", name: "Platinum", displaySymbol: "XPT" },
-  { symbol: "XPD", name: "Palladium", displaySymbol: "XPD" },
-  { symbol: "CL=F", name: "WTI Crude Oil", displaySymbol: "CL=F" },
-  { symbol: "BZ=F", name: "Brent Crude Oil", displaySymbol: "BZ=F" },
-];
-
-/** Metal symbols — fetched via Yahoo Finance futures (GC=F, SI=F, PL=F, PA=F) on the backend */
-export const METAL_SYMBOLS = new Set(["XAU", "XAG", "XPT", "XPD"]);
-/** Oil symbols fetched via Yahoo Finance on the backend */
-export const OIL_SYMBOLS = new Set(["CL=F", "BZ=F"]);
-
-function filterCommodities(query: string): SearchResult[] {
-  if (!query.trim()) return COMMODITY_LIST;
-  const q = query.toLowerCase();
-  return COMMODITY_LIST.filter(
-    (s) =>
-      s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q),
-  );
-}
-
-// ── Forex list ────────────────────────────────────────────────────────────────
+// Static forex list (Frankfurter has no search endpoint)
 const FOREX_LIST: SearchResult[] = [
   { symbol: "EUR", name: "Euro" },
   { symbol: "GBP", name: "British Pound" },
@@ -74,7 +50,7 @@ function filterForex(query: string): SearchResult[] {
   );
 }
 
-// ── Crypto via CoinGecko ──────────────────────────────────────────────────────
+// CoinGecko search - free, no key required
 async function searchCrypto(query: string): Promise<SearchResult[]> {
   if (!query.trim()) {
     try {
@@ -130,6 +106,9 @@ function formatPrice(price: number): string {
   return `$${price.toFixed(6)}`;
 }
 
+/**
+ * Map Yahoo Finance exchange codes to human-readable names
+ */
 function mapExchange(exchangeCode: string): string {
   const map: Record<string, string> = {
     NMS: "NASDAQ",
@@ -162,8 +141,7 @@ export function AssetSearchInput({
   const [stockSearchError, setStockSearchError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { actor } = useActor();
-  const { t } = useTranslation();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -188,12 +166,6 @@ export function AssetSearchInput({
   const triggerSearch = (q: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     setStockSearchError(null);
-
-    if (category === Category.Commodity) {
-      setResults(filterCommodities(q));
-      setDropdownOpen(true);
-      return;
-    }
 
     if (category === Category.Forex) {
       setResults(filterForex(q));
@@ -225,11 +197,14 @@ export function AssetSearchInput({
     }
 
     if (category === Category.Stock) {
+      // Require at least 1 char to trigger stock search
       if (!q.trim()) {
         setResults([]);
         setDropdownOpen(false);
         return;
       }
+
+      // Debounce: min 2 chars for stock search to avoid excessive calls
       if (q.trim().length < 2) {
         setResults([]);
         setDropdownOpen(true);
@@ -240,8 +215,9 @@ export function AssetSearchInput({
         setIsSearching(true);
         setStockSearchError(null);
         try {
+          const actor = getActorFromCache(queryClient);
           if (!actor) {
-            setStockSearchError(t("assets.searchNotConnected"));
+            setStockSearchError("Not connected — please wait and try again");
             setResults([]);
             setDropdownOpen(true);
             return;
@@ -258,7 +234,7 @@ export function AssetSearchInput({
           setResults(mapped);
           setDropdownOpen(true);
         } catch {
-          setStockSearchError(t("assets.searchFailed"));
+          setStockSearchError("Search failed — check your connection");
           setResults([]);
           setDropdownOpen(true);
         } finally {
@@ -299,6 +275,7 @@ export function AssetSearchInput({
     !isSearching &&
     category === Category.Stock;
 
+  // If asset already selected, show badge mode
   if (selectedSymbol) {
     return (
       <div
@@ -332,12 +309,10 @@ export function AssetSearchInput({
 
   const placeholder =
     category === Category.Stock
-      ? t("assets.searchPlaceholderStock")
+      ? "Gõ tên hoặc mã cổ phiếu (AAPL, VNM, TSLA...)..."
       : category === Category.Crypto
-        ? t("assets.searchPlaceholderCrypto")
-        : category === Category.Commodity
-          ? t("assets.searchPlaceholderCommodity")
-          : t("assets.searchPlaceholderForex");
+        ? "Tìm theo tên hoặc mã (bitcoin, BTC, ETH...)..."
+        : "Tìm đơn vị tiền tệ (USD, EUR, VND...)...";
 
   return (
     <div ref={containerRef} className="relative">
@@ -356,14 +331,16 @@ export function AssetSearchInput({
         )}
       </div>
 
+      {/* Hint: type more chars */}
       {showHint && (
         <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-lg shadow-lg">
           <p className="px-3 py-3 text-xs text-muted-foreground text-center">
-            {t("assets.searchMinChars")}
+            Nhập ít nhất 2 ký tự để tìm kiếm...
           </p>
         </div>
       )}
 
+      {/* Error state */}
       {showError && (
         <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-lg shadow-lg">
           <p className="px-3 py-3 text-xs text-red-400 text-center">
@@ -372,6 +349,7 @@ export function AssetSearchInput({
         </div>
       )}
 
+      {/* Results dropdown */}
       {showDropdown && (
         <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden">
           <ul className="max-h-64 overflow-y-auto">
@@ -409,10 +387,11 @@ export function AssetSearchInput({
         </div>
       )}
 
+      {/* No results */}
       {showNoResults && (
         <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-lg shadow-lg">
           <p className="px-3 py-3 text-xs text-muted-foreground text-center">
-            {t("assets.searchNotFound")} &ldquo;{query}&rdquo;
+            Không tìm thấy kết quả cho &ldquo;{query}&rdquo;
           </p>
         </div>
       )}

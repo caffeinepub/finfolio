@@ -1,8 +1,6 @@
 import type { Public } from "@/backend.d";
 import Sidebar, { type Page } from "@/components/Sidebar";
-import TopBar from "@/components/TopBar";
 import { Toaster } from "@/components/ui/sonner";
-import { PortfolioVisibilityProvider } from "@/contexts/PortfolioVisibilityContext";
 import { PriceFeedProvider } from "@/contexts/PriceFeedContext";
 import { useActor } from "@/hooks/useActor";
 import { useInternetIdentity } from "@/hooks/useInternetIdentity";
@@ -18,6 +16,7 @@ import { Loader2 } from "lucide-react";
 import { useState } from "react";
 
 function useGetCallerUserProfile() {
+  // Use actor from useActor() — this guarantees _initializeAccessControl has run
   const { actor, isFetching: actorFetching } = useActor();
 
   const query = useQuery<Public | null>({
@@ -27,9 +26,11 @@ function useGetCallerUserProfile() {
       try {
         return await actor.getCallerUserProfile();
       } catch {
+        // Backend throws when user is not yet registered
         return null;
       }
     },
+    // Only run after actor is fully ready (not fetching = _initializeAccessControl is done)
     enabled: !!actor && !actorFetching,
     retry: false,
   });
@@ -45,7 +46,6 @@ function AuthenticatedApp() {
   const [activePage, setActivePage] = useState<Page>("overview");
   const [dateRange, setDateRange] = useState("Last 30 Days");
   const [profileSetupDone, setProfileSetupDone] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const {
@@ -66,74 +66,47 @@ function AuthenticatedApp() {
     queryClient.invalidateQueries({ queryKey: ["profile"] });
   };
 
-  const handleNavigate = (page: Page) => {
-    setActivePage(page);
-    setSidebarOpen(false);
-  };
-
   return (
-    <PortfolioVisibilityProvider>
-      <PriceFeedProvider>
-        <div className="min-h-screen bg-background flex min-w-0 overflow-x-hidden w-full">
-          {/* Mobile overlay */}
-          {sidebarOpen && (
-            <div
-              className="fixed inset-0 bg-black/60 z-40 lg:hidden"
-              onClick={() => setSidebarOpen(false)}
-              onKeyDown={(e) => e.key === "Escape" && setSidebarOpen(false)}
-              aria-hidden="true"
-            />
-          )}
+    <PriceFeedProvider>
+      <div className="min-h-screen bg-background flex">
+        <Sidebar activePage={activePage} onNavigate={setActivePage} />
 
-          <Sidebar
-            activePage={activePage}
-            onNavigate={handleNavigate}
-            isOpen={sidebarOpen}
-            onClose={() => setSidebarOpen(false)}
-          />
-
-          {/* Main content: full width on mobile/tablet, offset on desktop */}
-          <main className="flex-1 min-h-screen lg:ml-60 ml-0 min-w-0 max-w-full overflow-x-hidden">
-            <div className="p-4 sm:p-6 w-full min-w-0 max-w-screen-xl mx-auto overflow-x-hidden">
-              {/* Shared TopBar — shown on all pages */}
-              <TopBar
+        <main className="flex-1 ml-60 min-h-screen">
+          <div className="p-6 max-w-screen-xl mx-auto">
+            {activePage === "overview" && (
+              <OverviewPage
                 dateRange={dateRange}
                 onDateRangeChange={setDateRange}
-                onToggleSidebar={() => setSidebarOpen((v) => !v)}
               />
+            )}
+            {activePage === "portfolio" && <PortfolioPage />}
+            {activePage === "assets" && <AssetsPage />}
+            {activePage === "transactions" && <TransactionsPage />}
+            {activePage === "settings" && <SettingsPage />}
+          </div>
 
-              {activePage === "overview" && (
-                <OverviewPage dateRange={dateRange} />
-              )}
-              {activePage === "portfolio" && <PortfolioPage />}
-              {activePage === "assets" && <AssetsPage />}
-              {activePage === "transactions" && <TransactionsPage />}
-              {activePage === "settings" && <SettingsPage />}
-            </div>
+          {/* Footer */}
+          <footer className="px-6 py-4 border-t border-border text-center">
+            <p className="text-xs text-muted-foreground">
+              &copy; {new Date().getFullYear()} Built with{" "}
+              <span className="text-fin-green">♥</span> using{" "}
+              <a
+                href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-fin-green/80 hover:text-fin-green transition-colors"
+              >
+                caffeine.ai
+              </a>
+            </p>
+          </footer>
+        </main>
 
-            {/* Footer */}
-            <footer className="px-4 sm:px-6 py-4 border-t border-border text-center">
-              <p className="text-xs text-muted-foreground">
-                &copy; {new Date().getFullYear()} Built with{" "}
-                <span className="text-fin-green">♥</span> using{" "}
-                <a
-                  href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-fin-green/80 hover:text-fin-green transition-colors"
-                >
-                  caffeine.ai
-                </a>
-              </p>
-            </footer>
-          </main>
-
-          {showProfileSetup && (
-            <ProfileSetupModal onComplete={handleProfileComplete} />
-          )}
-        </div>
-      </PriceFeedProvider>
-    </PortfolioVisibilityProvider>
+        {showProfileSetup && (
+          <ProfileSetupModal onComplete={handleProfileComplete} />
+        )}
+      </div>
+    </PriceFeedProvider>
   );
 }
 
@@ -142,12 +115,13 @@ export default function App() {
   const { isFetching: actorFetching } = useActor();
   const isAuthenticated = !!identity;
 
+  // Show full-page loader while identity is initializing OR actor is being set up
   if (isInitializing || (isAuthenticated && actorFetching)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 text-fin-green animate-spin" />
-          <p className="text-muted-foreground text-sm">Loading Miinsolio...</p>
+          <p className="text-muted-foreground text-sm">Loading FinFolio...</p>
         </div>
       </div>
     );

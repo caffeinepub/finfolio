@@ -10,9 +10,7 @@ import { IDL } from '@icp-sdk/core/candid';
 
 export const Category = IDL.Variant({
   'Stock' : IDL.Null,
-  'RealEstate' : IDL.Null,
   'Cash' : IDL.Null,
-  'Commodity' : IDL.Null,
   'Forex' : IDL.Null,
   'Crypto' : IDL.Null,
 });
@@ -55,36 +53,11 @@ export const UserRole = IDL.Variant({
   'user' : IDL.Null,
   'guest' : IDL.Null,
 });
-export const Public__2 = IDL.Record({
-  'id' : IDL.Nat,
-  'totalValue' : IDL.Float64,
-  'date' : IDL.Int,
-  'createdAt' : IDL.Int,
-});
-export const Public__3 = IDL.Record({
-  'id' : IDL.Nat,
-  'fee' : IDL.Float64,
-  'assetId' : IDL.Nat,
-  'date' : IDL.Int,
-  'note' : IDL.Text,
-  'createdAt' : IDL.Int,
-  'currency' : IDL.Text,
-  'quantity' : IDL.Float64,
-  'txType' : TxType,
-  'price' : IDL.Float64,
-});
 export const Public = IDL.Record({
   'baseCurrency' : IDL.Text,
   'displayName' : IDL.Text,
   'createdAt' : IDL.Int,
   'user' : IDL.Principal,
-});
-export const PortfolioExport = IDL.Record({
-  'assets' : IDL.Vec(Public__1),
-  'snapshots' : IDL.Vec(Public__2),
-  'exportedAt' : IDL.Int,
-  'transactions' : IDL.Vec(Public__3),
-  'profile' : IDL.Opt(Public),
 });
 export const Holding = IDL.Record({
   'currentPrice' : IDL.Float64,
@@ -99,11 +72,6 @@ export const Holding = IDL.Record({
   'category' : Category,
   'gainLossPercent' : IDL.Float64,
   'symbol' : IDL.Text,
-});
-export const MetalPrice = IDL.Record({
-  'currency' : IDL.Text,
-  'timestamp' : IDL.Int,
-  'price' : IDL.Float64,
 });
 export const PortfolioSummary = IDL.Record({
   'totalValue' : IDL.Float64,
@@ -137,33 +105,6 @@ export const Transaction = IDL.Record({
   'txType' : TxType,
   'price' : IDL.Float64,
 });
-export const AssetImport = IDL.Record({
-  'name' : IDL.Text,
-  'note' : IDL.Text,
-  'currency' : IDL.Text,
-  'category' : Category,
-  'manualPrice' : IDL.Float64,
-  'symbol' : IDL.Text,
-});
-export const TransactionImport = IDL.Record({
-  'fee' : IDL.Float64,
-  'assetId' : IDL.Nat,
-  'date' : IDL.Int,
-  'note' : IDL.Text,
-  'currency' : IDL.Text,
-  'quantity' : IDL.Float64,
-  'txType' : TxType,
-  'price' : IDL.Float64,
-});
-export const PortfolioImportInput = IDL.Record({
-  'assets' : IDL.Vec(AssetImport),
-  'transactions' : IDL.Vec(TransactionImport),
-});
-export const ImportResult = IDL.Record({
-  'assetsSkipped' : IDL.Nat,
-  'assetsImported' : IDL.Nat,
-  'transactionsImported' : IDL.Nat,
-});
 export const StockSearchResult = IDL.Record({
   'name' : IDL.Text,
   'exchange' : IDL.Text,
@@ -196,7 +137,6 @@ export const idlService = IDL.Service({
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
   'deleteAsset' : IDL.Func([IDL.Nat], [], []),
   'deleteTransaction' : IDL.Func([IDL.Nat], [], []),
-  'exportPortfolioData' : IDL.Func([], [PortfolioExport], ['query']),
   'getAsset' : IDL.Func([IDL.Nat], [IDL.Opt(Public__1)], ['query']),
   'getAssets' : IDL.Func([], [IDL.Vec(Public__1)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(Public)], ['query']),
@@ -208,8 +148,6 @@ export const idlService = IDL.Service({
     ),
   'getHoldings' : IDL.Func([], [IDL.Vec(Holding)], ['query']),
   'getHoldingsInCurrency' : IDL.Func([IDL.Text], [IDL.Vec(Holding)], ['query']),
-  'getMetalPrice' : IDL.Func([], [MetalPrice], []),
-  'getMetalPriceBySymbol' : IDL.Func([IDL.Text], [MetalPrice], []),
   'getPortfolioSummary' : IDL.Func([], [PortfolioSummary], ['query']),
   'getPortfolioSummaryInCurrency' : IDL.Func(
       [IDL.Text],
@@ -226,16 +164,10 @@ export const idlService = IDL.Service({
   'getTransaction' : IDL.Func([IDL.Nat], [IDL.Opt(Transaction)], ['query']),
   'getTransactions' : IDL.Func([], [IDL.Vec(Transaction)], ['query']),
   'getUserProfile' : IDL.Func([IDL.Principal], [IDL.Opt(Public)], ['query']),
-  'importPortfolioData' : IDL.Func([PortfolioImportInput], [ImportResult], []),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'saveCallerUserProfile' : IDL.Func([Public], [], []),
   'searchStocks' : IDL.Func([IDL.Text], [IDL.Vec(StockSearchResult)], []),
   'transform' : IDL.Func(
-      [TransformationInput],
-      [TransformationOutput],
-      ['query'],
-    ),
-  'transformMetal' : IDL.Func(
       [TransformationInput],
       [TransformationOutput],
       ['query'],
@@ -255,9 +187,7 @@ export const idlInitArgs = [];
 export const idlFactory = ({ IDL }) => {
   const Category = IDL.Variant({
     'Stock' : IDL.Null,
-    'RealEstate' : IDL.Null,
     'Cash' : IDL.Null,
-    'Commodity' : IDL.Null,
     'Forex' : IDL.Null,
     'Crypto' : IDL.Null,
   });
@@ -300,36 +230,11 @@ export const idlFactory = ({ IDL }) => {
     'user' : IDL.Null,
     'guest' : IDL.Null,
   });
-  const Public__2 = IDL.Record({
-    'id' : IDL.Nat,
-    'totalValue' : IDL.Float64,
-    'date' : IDL.Int,
-    'createdAt' : IDL.Int,
-  });
-  const Public__3 = IDL.Record({
-    'id' : IDL.Nat,
-    'fee' : IDL.Float64,
-    'assetId' : IDL.Nat,
-    'date' : IDL.Int,
-    'note' : IDL.Text,
-    'createdAt' : IDL.Int,
-    'currency' : IDL.Text,
-    'quantity' : IDL.Float64,
-    'txType' : TxType,
-    'price' : IDL.Float64,
-  });
   const Public = IDL.Record({
     'baseCurrency' : IDL.Text,
     'displayName' : IDL.Text,
     'createdAt' : IDL.Int,
     'user' : IDL.Principal,
-  });
-  const PortfolioExport = IDL.Record({
-    'assets' : IDL.Vec(Public__1),
-    'snapshots' : IDL.Vec(Public__2),
-    'exportedAt' : IDL.Int,
-    'transactions' : IDL.Vec(Public__3),
-    'profile' : IDL.Opt(Public),
   });
   const Holding = IDL.Record({
     'currentPrice' : IDL.Float64,
@@ -344,11 +249,6 @@ export const idlFactory = ({ IDL }) => {
     'category' : Category,
     'gainLossPercent' : IDL.Float64,
     'symbol' : IDL.Text,
-  });
-  const MetalPrice = IDL.Record({
-    'currency' : IDL.Text,
-    'timestamp' : IDL.Int,
-    'price' : IDL.Float64,
   });
   const PortfolioSummary = IDL.Record({
     'totalValue' : IDL.Float64,
@@ -382,33 +282,6 @@ export const idlFactory = ({ IDL }) => {
     'txType' : TxType,
     'price' : IDL.Float64,
   });
-  const AssetImport = IDL.Record({
-    'name' : IDL.Text,
-    'note' : IDL.Text,
-    'currency' : IDL.Text,
-    'category' : Category,
-    'manualPrice' : IDL.Float64,
-    'symbol' : IDL.Text,
-  });
-  const TransactionImport = IDL.Record({
-    'fee' : IDL.Float64,
-    'assetId' : IDL.Nat,
-    'date' : IDL.Int,
-    'note' : IDL.Text,
-    'currency' : IDL.Text,
-    'quantity' : IDL.Float64,
-    'txType' : TxType,
-    'price' : IDL.Float64,
-  });
-  const PortfolioImportInput = IDL.Record({
-    'assets' : IDL.Vec(AssetImport),
-    'transactions' : IDL.Vec(TransactionImport),
-  });
-  const ImportResult = IDL.Record({
-    'assetsSkipped' : IDL.Nat,
-    'assetsImported' : IDL.Nat,
-    'transactionsImported' : IDL.Nat,
-  });
   const StockSearchResult = IDL.Record({
     'name' : IDL.Text,
     'exchange' : IDL.Text,
@@ -438,7 +311,6 @@ export const idlFactory = ({ IDL }) => {
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
     'deleteAsset' : IDL.Func([IDL.Nat], [], []),
     'deleteTransaction' : IDL.Func([IDL.Nat], [], []),
-    'exportPortfolioData' : IDL.Func([], [PortfolioExport], ['query']),
     'getAsset' : IDL.Func([IDL.Nat], [IDL.Opt(Public__1)], ['query']),
     'getAssets' : IDL.Func([], [IDL.Vec(Public__1)], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(Public)], ['query']),
@@ -454,8 +326,6 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(Holding)],
         ['query'],
       ),
-    'getMetalPrice' : IDL.Func([], [MetalPrice], []),
-    'getMetalPriceBySymbol' : IDL.Func([IDL.Text], [MetalPrice], []),
     'getPortfolioSummary' : IDL.Func([], [PortfolioSummary], ['query']),
     'getPortfolioSummaryInCurrency' : IDL.Func(
         [IDL.Text],
@@ -472,20 +342,10 @@ export const idlFactory = ({ IDL }) => {
     'getTransaction' : IDL.Func([IDL.Nat], [IDL.Opt(Transaction)], ['query']),
     'getTransactions' : IDL.Func([], [IDL.Vec(Transaction)], ['query']),
     'getUserProfile' : IDL.Func([IDL.Principal], [IDL.Opt(Public)], ['query']),
-    'importPortfolioData' : IDL.Func(
-        [PortfolioImportInput],
-        [ImportResult],
-        [],
-      ),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'saveCallerUserProfile' : IDL.Func([Public], [], []),
     'searchStocks' : IDL.Func([IDL.Text], [IDL.Vec(StockSearchResult)], []),
     'transform' : IDL.Func(
-        [TransformationInput],
-        [TransformationOutput],
-        ['query'],
-      ),
-    'transformMetal' : IDL.Func(
         [TransformationInput],
         [TransformationOutput],
         ['query'],

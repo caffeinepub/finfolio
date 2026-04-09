@@ -1,8 +1,8 @@
+import type { backendInterface } from "@/backend";
 import { Category, type Public__1 } from "@/backend.d";
-import { METAL_SYMBOLS, OIL_SYMBOLS } from "@/components/AssetSearchInput";
-import { useActor } from "@/hooks/useActor";
 import { useGetAssets } from "@/hooks/useQueries";
 import { convertCurrency } from "@/utils/formatters";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   createContext,
   useCallback,
@@ -101,6 +101,22 @@ const PREFETCH_CURRENCIES = [
   "HKD",
   "KRW",
 ];
+
+function getActorFromCache(
+  qc: ReturnType<typeof useQueryClient>,
+): backendInterface | null {
+  const queries = qc.getQueriesData<backendInterface>({ queryKey: ["actor"] });
+  let bestActor: backendInterface | null = null;
+  for (const [queryKey, data] of queries) {
+    if (!data) continue;
+    const principal = queryKey[1] as string | undefined;
+    if (principal && principal !== "undefined" && principal !== "2vxsx-fae") {
+      return data;
+    }
+    bestActor = data;
+  }
+  return bestActor;
+}
 
 async function fetchCryptoPrices(
   symbols: string[],
@@ -282,7 +298,7 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
   // Cache: last successfully fetched prices per symbol — prevents zero values on API failure
   const pricesCacheRef = useRef<PriceMap>({});
   const { data: assets } = useGetAssets();
-  const { actor } = useActor();
+  const queryClient = useQueryClient();
 
   // Build the convert function using current exchangeRates and crypto prices
   const convert = useCallback(
@@ -313,28 +329,11 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
 
+    const actor = getActorFromCache(queryClient);
+
     const cryptoAssets = assets.filter((a) => a.category === Category.Crypto);
     const forexAssets = assets.filter((a) => a.category === Category.Forex);
     const stockAssets = assets.filter((a) => a.category === Category.Stock);
-    const commodityAssets = assets.filter(
-      (a) => a.category === Category.Commodity,
-    );
-
-    // Split commodity assets by price source
-    const metalAssets = commodityAssets.filter((a) =>
-      METAL_SYMBOLS.has(a.symbol.toUpperCase()),
-    );
-    const oilAssets = commodityAssets.filter((a) =>
-      OIL_SYMBOLS.has(a.symbol.toUpperCase()),
-    );
-
-    // Yahoo Finance futures symbol mapping for metals
-    const METAL_TO_YAHOO: Record<string, string> = {
-      XAU: "GC=F",
-      XAG: "SI=F",
-      XPT: "PL=F",
-      XPD: "PA=F",
-    };
 
     // Collect all asset currencies for exchange rate prefetch
     const assetCurrencies = [
@@ -346,125 +345,35 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
 
     const cryptoSymbols = cryptoAssets.map((a) => a.symbol);
 
-    // Build per-metal fetch promises via Yahoo Finance futures symbols
-    const metalFetchPromises = metalAssets.map(async (asset) => {
-      const sym = asset.symbol.toUpperCase();
-      const yahooSymbol = METAL_TO_YAHOO[sym];
-      if (!yahooSymbol) {
-        console.warn(
-          `[PriceFeed] No Yahoo futures symbol mapping for metal: ${sym}`,
-        );
-        // If no mapping, try fetching with the asset symbol directly (last resort)
-        if (actor?.getStockPrice) {
-          try {
-            const res = await actor.getStockPrice(sym);
-            if (res.ok && res.price > 0) {
-              return {
-                asset,
-                result: { price: res.price, change24h: res.change24h },
-              };
-            }
-          } catch {
-            /* ignore */
-          }
-        }
-        return { asset, result: null };
-      }
-      if (actor?.getStockPrice) {
-        try {
-          const res = await actor.getStockPrice(yahooSymbol);
-          if (res.ok && res.price > 0) {
-            return {
-              asset,
-              result: { price: res.price, change24h: res.change24h },
-            };
-          }
-          console.warn(
-            `[PriceFeed] Metal price fetch returned no data for ${sym} (${yahooSymbol}): ok=${res.ok}, price=${res.price}`,
-          );
-          // Retry once with the asset symbol itself as fallback
-          try {
-            const res2 = await actor.getStockPrice(sym);
-            if (res2.ok && res2.price > 0) {
-              return {
-                asset,
-                result: { price: res2.price, change24h: res2.change24h },
-              };
-            }
-          } catch {
-            /* ignore */
-          }
-        } catch (err) {
-          console.warn(
-            `[PriceFeed] Metal price fetch failed for ${sym} (${yahooSymbol}):`,
-            err,
-          );
-        }
-      }
-      return { asset, result: null };
-    });
-
-    // Oil symbols via Yahoo Finance (same path as stocks)
-    const oilFetchPromises = oilAssets.map(async (asset) => {
-      if (actor?.getStockPrice) {
-        try {
-          const res = await actor.getStockPrice(asset.symbol);
-          if (res.ok && res.price > 0) {
-            return {
-              asset,
-              result: { price: res.price, change24h: res.change24h },
-            };
-          }
-          console.warn(
-            `[PriceFeed] Oil price fetch returned no data for ${asset.symbol}: ok=${res.ok}, price=${res.price}`,
-          );
-        } catch (err) {
-          console.warn(
-            `[PriceFeed] Oil price fetch failed for ${asset.symbol}:`,
-            err,
-          );
-        }
-      }
-      return { asset, result: null };
-    });
-
-    const [
-      cryptoBatchResult,
-      forexResults,
-      stockResults,
-      freshRates,
-      metalResults,
-      oilResults,
-    ] = await Promise.all([
-      fetchCryptoPrices(cryptoSymbols),
-      Promise.all(
-        forexAssets.map(async (asset) => {
-          const result = await fetchForexPrice(asset.symbol);
-          return { asset, result };
-        }),
-      ),
-      Promise.all(
-        stockAssets.map(async (asset) => {
-          if (actor?.getStockPrice) {
-            try {
-              const res = await actor.getStockPrice(asset.symbol);
-              if (res.ok && res.price > 0) {
-                return {
-                  asset,
-                  result: { price: res.price, change24h: res.change24h },
-                };
+    const [cryptoBatchResult, forexResults, stockResults, freshRates] =
+      await Promise.all([
+        fetchCryptoPrices(cryptoSymbols),
+        Promise.all(
+          forexAssets.map(async (asset) => {
+            const result = await fetchForexPrice(asset.symbol);
+            return { asset, result };
+          }),
+        ),
+        Promise.all(
+          stockAssets.map(async (asset) => {
+            if (actor?.getStockPrice) {
+              try {
+                const res = await actor.getStockPrice(asset.symbol);
+                if (res.ok && res.price > 0) {
+                  return {
+                    asset,
+                    result: { price: res.price, change24h: res.change24h },
+                  };
+                }
+              } catch {
+                // fall through
               }
-            } catch {
-              // fall through
             }
-          }
-          return { asset, result: null };
-        }),
-      ),
-      fetchExchangeRates(allCurrenciesToFetch),
-      Promise.all(metalFetchPromises),
-      Promise.all(oilFetchPromises),
-    ]);
+            return { asset, result: null };
+          }),
+        ),
+        fetchExchangeRates(allCurrenciesToFetch),
+      ]);
 
     // Update exchange rates
     setExchangeRates(freshRates);
@@ -476,6 +385,7 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
     for (const asset of cryptoAssets) {
       const result = cryptoBatchResult[asset.symbol];
       if (result && result.price > 0) {
+        // Live price success — update cache
         const entry: PriceEntry = {
           price: result.price,
           change24h: result.change24h,
@@ -486,6 +396,7 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
         newPrices[asset.symbol] = entry;
         pricesCacheRef.current[asset.symbol] = entry;
       } else {
+        // Live fetch failed — use cached price if available
         const cached = pricesCacheRef.current[asset.symbol];
         if (cached && cached.price > 0) {
           console.warn(
@@ -497,6 +408,7 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
             updatedAt: now,
           };
         } else if (asset.manualPrice > 0) {
+          // Last resort: use manualPrice only if it's non-zero
           newPrices[asset.symbol] = {
             price: asset.manualPrice,
             change24h: 0,
@@ -505,6 +417,7 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
             updatedAt: now,
           };
         } else {
+          // Truly no data — mark as error but preserve 0 so UI can show "N/A"
           newPrices[asset.symbol] = {
             price: 0,
             change24h: 0,
@@ -585,96 +498,6 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
-    // ── Commodity: Metals (XAU, XAG, XPT, XPD) via Yahoo Finance futures ──
-    for (const { asset, result } of metalResults) {
-      const key = asset.symbol;
-      if (result && result.price > 0) {
-        const entry: PriceEntry = {
-          price: result.price,
-          change24h: result.change24h,
-          source: "yahoo",
-          status: "live",
-          updatedAt: now,
-        };
-        newPrices[key] = entry;
-        pricesCacheRef.current[key] = entry;
-      } else {
-        // Fallback chain: cached → manualPrice → retry with Yahoo symbol directly
-        const cached = pricesCacheRef.current[key];
-        if (cached && cached.price > 0) {
-          newPrices[key] = { ...cached, status: "stale", updatedAt: now };
-        } else if (asset.manualPrice > 0) {
-          newPrices[key] = {
-            price: asset.manualPrice,
-            change24h: 0,
-            source: "manual",
-            status: "error",
-            updatedAt: now,
-          };
-        } else {
-          // Keep price undefined so OverviewPage can use avgCost fallback
-          // Don't store a zero-price entry — it would look like the asset has no value
-          newPrices[key] = {
-            price: 0,
-            change24h: 0,
-            source: "manual",
-            status: "error",
-            updatedAt: now,
-          };
-        }
-      }
-    }
-
-    // ── Commodity: Oil (CL=F, BZ=F) via Yahoo Finance ──
-    for (const { asset, result } of oilResults) {
-      const key = asset.symbol;
-      if (result && result.price > 0) {
-        const entry: PriceEntry = {
-          price: result.price,
-          change24h: result.change24h,
-          source: "yahoo",
-          status: "live",
-          updatedAt: now,
-        };
-        newPrices[key] = entry;
-        pricesCacheRef.current[key] = entry;
-      } else {
-        const cached = pricesCacheRef.current[key];
-        if (cached && cached.price > 0) {
-          newPrices[key] = { ...cached, status: "stale", updatedAt: now };
-        } else if (asset.manualPrice > 0) {
-          newPrices[key] = {
-            price: asset.manualPrice,
-            change24h: 0,
-            source: "manual",
-            status: "error",
-            updatedAt: now,
-          };
-        } else {
-          newPrices[key] = {
-            price: 0,
-            change24h: 0,
-            source: "manual",
-            status: "error",
-            updatedAt: now,
-          };
-        }
-      }
-    }
-
-    // ── Real Estate (manual price only) ──
-    for (const asset of assets.filter(
-      (a) => a.category === Category.RealEstate,
-    )) {
-      newPrices[asset.symbol] = {
-        price: asset.manualPrice,
-        change24h: 0,
-        source: "manual",
-        status: "live",
-        updatedAt: now,
-      };
-    }
-
     setPrices((prev) => {
       const merged = { ...prev, ...newPrices };
       for (const listener of listenersRef.current) {
@@ -693,7 +516,7 @@ export function PriceFeedProvider({ children }: { children: React.ReactNode }) {
     }
 
     isFetchingRef.current = false;
-  }, [assets, actor]);
+  }, [assets, queryClient]);
 
   useEffect(() => {
     if (!assets || assets.length === 0) {

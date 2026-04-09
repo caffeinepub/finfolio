@@ -24,8 +24,6 @@ actor {
       #Crypto;
       #Forex;
       #Cash;
-      #Commodity;
-      #RealEstate;
     };
     public type Public = {
       id : Nat;
@@ -160,13 +158,6 @@ actor {
     exchange : Text;
   };
 
-  // Metal price result type (MetalMetric API)
-  type MetalPrice = {
-    price : Float;
-    currency : Text;
-    timestamp : Int;
-  };
-
   // Input type for addTransaction that accepts optional currency
   type AddTransactionInput = {
     id : Nat;
@@ -179,48 +170,6 @@ actor {
     date : Int;
     note : Text;
     createdAt : Int;
-  };
-
-  // Portfolio export/import types
-  type PortfolioExport = {
-    assets : [Asset.Public];
-    transactions : [Transaction.Public];
-    snapshots : [PortfolioSnapshot.Public];
-    profile : ?UserProfile.Public;
-    exportedAt : Int;
-  };
-
-  // Asset import omits id and createdAt (assigned server-side)
-  type AssetImport = {
-    symbol : Text;
-    name : Text;
-    category : Asset.Category;
-    currency : Text;
-    manualPrice : Float;
-    note : Text;
-  };
-
-  // Transaction import omits id and createdAt; assetId references the old asset id from export
-  type TransactionImport = {
-    assetId : Nat; // old asset id — will be remapped during import
-    txType : Transaction.TxType;
-    quantity : Float;
-    price : Float;
-    currency : Text;
-    fee : Float;
-    date : Int;
-    note : Text;
-  };
-
-  type PortfolioImportInput = {
-    assets : [AssetImport];
-    transactions : [TransactionImport];
-  };
-
-  type ImportResult = {
-    assetsImported : Nat;
-    assetsSkipped : Nat;
-    transactionsImported : Nat;
   };
 
   // State
@@ -238,16 +187,6 @@ actor {
   // 30-minute cache TTL in nanoseconds
   let exchangeRateCacheTtl : Int = 30 * 60 * 1_000_000_000;
 
-  // Legacy stable vars kept for backward-compatibility (migration from single-symbol cache)
-  var _metalPriceCache : ?MetalPrice = null;
-  var _metalPriceCacheTime : Int = 0;
-
-  // Metal price cache per symbol (e.g. XAU, XAG, XPT, XPD)
-  let metalPriceCacheMap = Map.empty<Text, MetalPrice>();
-  let metalPriceCacheTimeMap = Map.empty<Text, Int>();
-  // 5-minute cache TTL in nanoseconds
-  let metalPriceCacheTtl : Int = 5 * 60 * 1_000_000_000;
-
   // Authorization
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
@@ -259,11 +198,6 @@ actor {
 
   // Transform for search HTTP outcalls
   public query func transformSearch(input : HttpOutcall.TransformationInput) : async HttpOutcall.TransformationOutput {
-    HttpOutcall.transform(input);
-  };
-
-  // Transform for metal price HTTP outcalls
-  public query func transformMetal(input : HttpOutcall.TransformationInput) : async HttpOutcall.TransformationOutput {
     HttpOutcall.transform(input);
   };
 
@@ -730,74 +664,6 @@ actor {
     };
   };
 
-  // -------------------------------------------------------
-  // Metal price via MetalMetric API (server-side outcall)
-  // Supports XAU (gold), XAG (silver), XPT (platinum), XPD (palladium)
-  // Endpoint: GET https://metalmetric.com/api/v1/price/{symbol}/USD
-  // Response: {"price": 2300.50, "currency": "USD", ...}
-  // Each symbol is cached independently for 5 minutes
-  // -------------------------------------------------------
-  public shared func getMetalPriceBySymbol(symbol : Text) : async MetalPrice {
-    let upperSymbol = symbol.toUpper();
-    let now = Time.now();
-    // Check per-symbol cache
-    switch (metalPriceCacheMap.get(upperSymbol)) {
-      case (?cached) {
-        let cacheTime = switch (metalPriceCacheTimeMap.get(upperSymbol)) {
-          case (?t) { t };
-          case (null) { 0 };
-        };
-        if (now - cacheTime <= metalPriceCacheTtl) {
-          return cached;
-        };
-      };
-      case (null) {};
-    };
-    // Cache miss or stale — fetch fresh price
-    let lowerSymbol = symbol.toLower();
-    let url = "https://metalmetric.com/api/v1/price/" # lowerSymbol # "/USD";
-    try {
-      let body = await HttpOutcall.httpGetRequest(
-        url,
-        [{ name = "Accept"; value = "application/json" }],
-        transformMetal,
-      );
-      let price = switch (extractFloat(body, "price")) {
-        case (null) {
-          // Return stale cache if available, else error value
-          switch (metalPriceCacheMap.get(upperSymbol)) {
-            case (?cached) { return cached };
-            case (null) { return { price = 0.0; currency = "USD"; timestamp = now } };
-          };
-        };
-        case (?p) {
-          if (p == 0.0) {
-            switch (metalPriceCacheMap.get(upperSymbol)) {
-              case (?cached) { return cached };
-              case (null) { return { price = 0.0; currency = "USD"; timestamp = now } };
-            };
-          };
-          p;
-        };
-      };
-      let result : MetalPrice = { price; currency = "USD"; timestamp = now };
-      metalPriceCacheMap.add(upperSymbol, result);
-      metalPriceCacheTimeMap.add(upperSymbol, now);
-      result;
-    } catch (_) {
-      // Return stale cache if available, else zero
-      switch (metalPriceCacheMap.get(upperSymbol)) {
-        case (?cached) { cached };
-        case (null) { { price = 0.0; currency = "USD"; timestamp = now } };
-      };
-    };
-  };
-
-  // Backward-compatible: fetches gold (XAU/USD) price — delegates to getMetalPriceBySymbol
-  public shared func getMetalPrice() : async MetalPrice {
-    await getMetalPriceBySymbol("XAU");
-  };
-
   // Internal: look up rate for a currency vs USD from the cache
   // Returns 1.0 if not found (treats unknown as USD)
   func getRateVsUsd(currency : Text) : Float {
@@ -1241,8 +1107,6 @@ actor {
         case (#Crypto) { "Crypto" };
         case (#Forex) { "Forex" };
         case (#Cash) { "Cash" };
-        case (#Commodity) { "Commodity" };
-        case (#RealEstate) { "RealEstate" };
       };
       switch (allocationMap.get(catKey)) {
         case (null) {
@@ -1271,127 +1135,6 @@ actor {
       totalGainLossPercent = gainLossPercent;
       dailyChange = 0.0;
       allocation;
-    };
-  };
-
-  // -------------------------------------------------------
-  // Portfolio Export
-  // Returns all caller data as a portable snapshot
-  // -------------------------------------------------------
-  public query ({ caller }) func exportPortfolioData() : async PortfolioExport {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can export portfolio");
-    };
-    let callerAssets = getCallerAssets(caller).values().toArray().sort();
-    let callerTxs = getCallerTransactions(caller).values().toArray().sort();
-    let callerSnaps = getCallerSnapshots(caller).values().toArray().sort();
-    let callerProfile = userProfiles.get(caller);
-    {
-      assets = callerAssets;
-      transactions = callerTxs;
-      snapshots = callerSnaps;
-      profile = callerProfile;
-      exportedAt = Time.now();
-    };
-  };
-
-  // -------------------------------------------------------
-  // Portfolio Import
-  // Merges assets and transactions into caller's data.
-  // Assets are deduplicated by symbol+category.
-  // Transactions are always appended (no dedup).
-  // -------------------------------------------------------
-  public shared ({ caller }) func importPortfolioData(data : PortfolioImportInput) : async ImportResult {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can import portfolio");
-    };
-    let userAssets = getCallerAssets(caller);
-    let userTxs = getCallerTransactions(caller);
-    let now = Time.now();
-
-    // Map old asset id → new asset id
-    let idMap = Map.empty<Nat, Nat>();
-    var assetsImported : Nat = 0;
-    var assetsSkipped : Nat = 0;
-    var txImported : Nat = 0;
-
-    // Process assets with index so we can track old id by position
-    var assetIdx : Nat = 0;
-    for (importAsset in data.assets.values()) {
-      // Use index as the "old id" key (import input has no id field)
-      let oldId = assetIdx;
-      assetIdx += 1;
-
-      // Check if symbol+category already exists for caller
-      let existing = userAssets.values().find(
-        func(a) {
-          a.symbol == importAsset.symbol and a.category == importAsset.category;
-        }
-      );
-      switch (existing) {
-        case (?found) {
-          // Already exists — map old index to existing id, skip creation
-          idMap.add(oldId, found.id);
-          assetsSkipped += 1;
-        };
-        case (null) {
-          // New asset — create it
-          let newId = nextAssetId;
-          nextAssetId += 1;
-          let newAsset : Asset.Public = {
-            id = newId;
-            symbol = importAsset.symbol;
-            name = importAsset.name;
-            category = importAsset.category;
-            currency = importAsset.currency;
-            manualPrice = importAsset.manualPrice;
-            note = importAsset.note;
-            createdAt = now;
-          };
-          userAssets.add(newId, newAsset);
-          idMap.add(oldId, newId);
-          assetsImported += 1;
-        };
-      };
-    };
-    assets.add(caller, userAssets);
-
-    // Process transactions — remap assetId via idMap, skip orphans
-    for (importTx in data.transactions.values()) {
-      switch (idMap.get(importTx.assetId)) {
-        case (null) {}; // orphan — old assetId not in export, skip
-        case (?remappedAssetId) {
-          let txId = nextTransactionId;
-          nextTransactionId += 1;
-          let resolvedCurrency = if (importTx.currency == "") {
-            switch (userAssets.get(remappedAssetId)) {
-              case (?a) { a.currency };
-              case (null) { "USD" };
-            };
-          } else { importTx.currency };
-          let newTx : Transaction = {
-            id = txId;
-            assetId = remappedAssetId;
-            txType = importTx.txType;
-            quantity = importTx.quantity;
-            price = importTx.price;
-            currency = resolvedCurrency;
-            fee = importTx.fee;
-            date = importTx.date;
-            note = importTx.note;
-            createdAt = now;
-          };
-          userTxs.add(txId, newTx);
-          txImported += 1;
-        };
-      };
-    };
-    transactions.add(caller, userTxs);
-
-    {
-      assetsImported;
-      assetsSkipped;
-      transactionsImported = txImported;
     };
   };
 
@@ -1426,8 +1169,6 @@ actor {
         case (#Crypto) { "Crypto" };
         case (#Forex) { "Forex" };
         case (#Cash) { "Cash" };
-        case (#Commodity) { "Commodity" };
-        case (#RealEstate) { "RealEstate" };
       };
       let convertedValue = if (targetCurrency == "" or holding.currency == targetCurrency) {
         holding.totalValue;

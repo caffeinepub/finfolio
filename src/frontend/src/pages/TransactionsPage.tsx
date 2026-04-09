@@ -48,7 +48,6 @@ import {
 import { ArrowLeftRight, Edit2, Plus, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 const TODAY = formatDateInput(Date.now());
@@ -101,7 +100,6 @@ function CurrencySelect({
 }
 
 export default function TransactionsPage() {
-  const { t } = useTranslation();
   const { data: transactions, isLoading: txLoading } = useGetTransactions();
   const { data: assets } = useGetAssets();
   const addTransaction = useAddTransaction();
@@ -199,7 +197,7 @@ export default function TransactionsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!addForm.assetId) {
-      toast.error(t("transactions.pleaseSelectAsset"));
+      toast.error("Please select an asset");
       return;
     }
     try {
@@ -215,10 +213,10 @@ export default function TransactionsPage() {
         note: addForm.note,
         currency: addForm.currency,
       });
-      toast.success(t("transactions.txAdded"));
+      toast.success("Transaction added");
       setDialogOpen(false);
     } catch {
-      toast.error(t("transactions.failedToAdd"));
+      toast.error("Failed to add transaction");
     }
   };
 
@@ -238,10 +236,10 @@ export default function TransactionsPage() {
         note: editForm.note,
         currency: editForm.currency,
       });
-      toast.success(t("transactions.txUpdated"));
+      toast.success("Transaction updated");
       closeEdit();
     } catch {
-      toast.error(t("transactions.failedToUpdate"));
+      toast.error("Failed to update transaction");
     }
   };
 
@@ -249,10 +247,10 @@ export default function TransactionsPage() {
     if (!deleteTarget) return;
     try {
       await deleteTransaction.mutateAsync(deleteTarget.id);
-      toast.success(t("transactions.txDeleted"));
+      toast.success("Transaction deleted");
       setDeleteTarget(null);
     } catch {
-      toast.error(t("transactions.failedToDelete"));
+      toast.error("Failed to delete transaction");
     }
   };
 
@@ -262,55 +260,44 @@ export default function TransactionsPage() {
     return assetById.get(tx.assetId.toString())?.currency ?? "USD";
   };
 
-  const filterLabels: Record<string, string> = {
-    All: t("common.all"),
-    [TxType.Buy]: t("badges.Buy"),
-    [TxType.Sell]: t("badges.Sell"),
-    [TxType.Deposit]: t("badges.Deposit"),
-    [TxType.Withdraw]: t("badges.Withdraw"),
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      {/* Page header — flex-wrap on mobile */}
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-4 sm:mb-6">
-        <div className="min-w-0">
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground">
-            {t("transactions.title")}
-          </h1>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Transactions</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            {t("transactions.subtitle")}
+            Full transaction history
           </p>
         </div>
         <Button
           onClick={openAdd}
-          className="bg-fin-green text-background hover:bg-fin-green/90 gap-2 min-h-[44px] shrink-0"
+          className="bg-fin-green text-background hover:bg-fin-green/90 gap-2"
           data-ocid="transactions.add_button"
         >
-          <Plus className="w-4 h-4" /> {t("transactions.addTransaction")}
+          <Plus className="w-4 h-4" /> Add Transaction
         </Button>
       </div>
 
-      {/* Filters — wrap nicely on mobile */}
-      <div className="flex gap-2 mb-4 flex-wrap items-center">
+      {/* Filters */}
+      <div className="flex gap-2 mb-4 flex-wrap">
         {["All", TxType.Buy, TxType.Sell, TxType.Deposit, TxType.Withdraw].map(
-          (type) => (
+          (t) => (
             <button
               type="button"
-              key={type}
-              onClick={() => setFilterType(type)}
+              key={t}
+              onClick={() => setFilterType(t)}
               data-ocid="transactions.filter.tab"
-              className={`px-3 py-2 min-h-[36px] rounded-full text-xs font-medium transition-colors ${
-                filterType === type
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                filterType === t
                   ? "bg-fin-green/20 text-fin-green border border-fin-green/30"
                   : "bg-muted text-muted-foreground border border-transparent hover:text-foreground"
               }`}
             >
-              {filterLabels[type] ?? type}
+              {t}
             </button>
           ),
         )}
@@ -319,10 +306,10 @@ export default function TransactionsPage() {
           <select
             value={filterAsset}
             onChange={(e) => setFilterAsset(e.target.value)}
-            className="h-9 px-2 rounded-full bg-muted border border-transparent text-xs text-muted-foreground focus:outline-none focus:border-fin-green/30"
+            className="h-8 px-2 rounded-full bg-muted border border-transparent text-xs text-muted-foreground focus:outline-none focus:border-fin-green/30"
             data-ocid="transactions.asset.select"
           >
-            <option value="all">{t("common.allAssets")}</option>
+            <option value="all">All Assets</option>
             {assets.map((a) => (
               <option key={a.id.toString()} value={a.id.toString()}>
                 {a.symbol}
@@ -340,8 +327,8 @@ export default function TransactionsPage() {
         ) : filtered.length === 0 ? (
           <div className="p-6">
             <EmptyState
-              title={t("transactions.noTransactionsFound")}
-              description={t("transactions.noTransactionsDesc")}
+              title="No transactions found"
+              description="Add a transaction to start tracking your portfolio performance."
               icon={ArrowLeftRight}
               action={
                 <Button
@@ -349,43 +336,42 @@ export default function TransactionsPage() {
                   className="bg-fin-green text-background hover:bg-fin-green/90"
                   data-ocid="transactions.empty_state"
                 >
-                  <Plus className="w-4 h-4 mr-1" />{" "}
-                  {t("transactions.addTransaction")}
+                  <Plus className="w-4 h-4 mr-1" /> Add Transaction
                 </Button>
               }
             />
           </div>
         ) : (
-          <div className="overflow-x-auto w-full rounded-lg">
-            <Table className="min-w-[340px]">
+          <div className="overflow-x-auto">
+            <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="text-muted-foreground text-xs pl-4 sm:pl-5">
-                    {t("transactions.dateCol")}
+                  <TableHead className="text-muted-foreground text-xs pl-5">
+                    Date
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs">
-                    {t("transactions.typeCol")}
+                    Type
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs">
-                    {t("transactions.assetCol")}
+                    Asset
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right">
-                    {t("transactions.quantityCol")}
-                  </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right hidden sm:table-cell">
-                    {t("transactions.priceCol")}
-                  </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right hidden sm:table-cell">
-                    {t("transactions.feeCol")}
+                    Quantity
                   </TableHead>
                   <TableHead className="text-muted-foreground text-xs text-right">
-                    {t("transactions.amountCol")}
+                    Price
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs hidden sm:table-cell">
-                    {t("transactions.noteCol")}
+                  <TableHead className="text-muted-foreground text-xs text-right">
+                    Fee
                   </TableHead>
-                  <TableHead className="text-muted-foreground text-xs text-right pr-4 sm:pr-5">
-                    {t("transactions.actionsCol")}
+                  <TableHead className="text-muted-foreground text-xs text-right">
+                    Amount
+                  </TableHead>
+                  <TableHead className="text-muted-foreground text-xs">
+                    Note
+                  </TableHead>
+                  <TableHead className="text-muted-foreground text-xs text-right pr-5">
+                    Actions
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -402,13 +388,13 @@ export default function TransactionsPage() {
                       className="border-border hover:bg-muted/30"
                       data-ocid={`transactions.item.${i + 1}`}
                     >
-                      <TableCell className="pl-4 sm:pl-5 text-xs text-muted-foreground whitespace-nowrap">
+                      <TableCell className="pl-5 text-xs text-muted-foreground">
                         {formatDate(tx.date)}
                       </TableCell>
                       <TableCell>
                         <TxTypeBadge txType={tx.txType} />
                       </TableCell>
-                      <TableCell className="text-xs sm:text-sm font-bold font-mono text-foreground">
+                      <TableCell className="text-sm font-bold font-mono text-foreground">
                         <div className="flex flex-col">
                           <span>{symbol}</span>
                           {txCurrency !== "USD" && (
@@ -418,47 +404,45 @@ export default function TransactionsPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right text-xs sm:text-sm text-foreground tabular-nums">
+                      <TableCell className="text-right text-sm text-foreground tabular-nums">
                         {tx.quantity.toLocaleString(undefined, {
                           maximumFractionDigits: 6,
                         })}
                       </TableCell>
-                      <TableCell className="text-right text-xs sm:text-sm text-muted-foreground tabular-nums whitespace-nowrap hidden sm:table-cell">
+                      <TableCell className="text-right text-sm text-muted-foreground tabular-nums">
                         {formatCurrency(tx.price, txCurrency)}
                       </TableCell>
-                      <TableCell className="text-right text-xs text-muted-foreground tabular-nums whitespace-nowrap hidden sm:table-cell">
+                      <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
                         {formatCurrency(tx.fee, txCurrency)}
                       </TableCell>
                       <TableCell
-                        className={`text-right text-xs sm:text-sm font-medium tabular-nums whitespace-nowrap ${
+                        className={`text-right text-sm font-medium tabular-nums ${
                           isBuyOrDeposit ? "text-fin-green" : "text-fin-red"
                         }`}
                       >
                         {isBuyOrDeposit ? "+" : "-"}
                         {formatCurrency(amount, txCurrency)}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[100px] truncate hidden sm:table-cell">
+                      <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate">
                         {tx.note || "—"}
                       </TableCell>
-                      <TableCell className="text-right pr-4 sm:pr-5">
+                      <TableCell className="text-right pr-5">
                         <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 sm:h-7 sm:w-7 text-muted-foreground hover:text-yellow-400 transition-colors"
+                            className="h-7 w-7 text-muted-foreground hover:text-yellow-400 transition-colors"
                             onClick={() => openEdit(tx)}
                             data-ocid={`transactions.edit_button.${i + 1}`}
-                            aria-label={t("transactions.editTransaction")}
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 sm:h-7 sm:w-7 text-muted-foreground hover:text-fin-red transition-colors"
+                            className="h-7 w-7 text-muted-foreground hover:text-fin-red transition-colors"
                             onClick={() => setDeleteTarget(tx)}
                             data-ocid={`transactions.delete_button.${i + 1}`}
-                            aria-label={t("common.delete")}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
@@ -476,20 +460,18 @@ export default function TransactionsPage() {
       {/* Add Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
-          className="bg-card border-border w-full max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[90vh] overflow-y-auto"
+          className="bg-card border-border max-w-md"
           data-ocid="transactions.dialog"
         >
           <DialogHeader>
             <DialogTitle className="text-foreground">
-              {t("transactions.addTransaction")}
+              Add Transaction
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-foreground text-sm">
-                  {t("transactions.assetLabel")} *
-                </Label>
+                <Label className="text-foreground text-sm">Asset *</Label>
                 <select
                   value={addForm.assetId}
                   onChange={(e) => handleAddAssetChange(e.target.value)}
@@ -497,7 +479,7 @@ export default function TransactionsPage() {
                   required
                   data-ocid="transactions.asset_select.select"
                 >
-                  <option value="">{t("transactions.selectAsset")}</option>
+                  <option value="">Select asset...</option>
                   {assets?.map((a) => (
                     <option key={a.id.toString()} value={a.id.toString()}>
                       {a.symbol} — {a.name}
@@ -506,9 +488,7 @@ export default function TransactionsPage() {
                 </select>
               </div>
               <div>
-                <Label className="text-foreground text-sm">
-                  {t("transactions.typeLabel")} *
-                </Label>
+                <Label className="text-foreground text-sm">Type *</Label>
                 <select
                   value={addForm.txType}
                   onChange={(e) =>
@@ -520,20 +500,16 @@ export default function TransactionsPage() {
                   className="mt-1 w-full h-10 px-3 rounded-md bg-muted border border-border text-foreground text-sm"
                   data-ocid="transactions.type.select"
                 >
-                  <option value={TxType.Buy}>{t("badges.Buy")}</option>
-                  <option value={TxType.Sell}>{t("badges.Sell")}</option>
-                  <option value={TxType.Deposit}>{t("badges.Deposit")}</option>
-                  <option value={TxType.Withdraw}>
-                    {t("badges.Withdraw")}
-                  </option>
+                  <option value={TxType.Buy}>Buy</option>
+                  <option value={TxType.Sell}>Sell</option>
+                  <option value={TxType.Deposit}>Deposit</option>
+                  <option value={TxType.Withdraw}>Withdraw</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <Label className="text-foreground text-sm">
-                {t("transactions.currencyLabel")} *
-              </Label>
+              <Label className="text-foreground text-sm">Currency *</Label>
               <CurrencySelect
                 value={addForm.currency}
                 onChange={(v) => setAddForm((p) => ({ ...p, currency: v }))}
@@ -541,15 +517,13 @@ export default function TransactionsPage() {
               />
               {addForm.currency === "VND" && (
                 <p className="text-[11px] text-fin-green mt-1">
-                  {t("transactions.vndNote")}
+                  🇻🇳 Vietnamese Dong — giá nhập theo đơn vị VND
                 </p>
               )}
             </div>
 
             <div>
-              <Label className="text-foreground text-sm">
-                {t("transactions.dateLabel")} *
-              </Label>
+              <Label className="text-foreground text-sm">Date *</Label>
               <Input
                 type="date"
                 value={addForm.date}
@@ -563,9 +537,7 @@ export default function TransactionsPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-foreground text-sm">
-                  {t("transactions.quantityLabel")} *
-                </Label>
+                <Label className="text-foreground text-sm">Quantity *</Label>
                 <Input
                   type="number"
                   step="any"
@@ -581,7 +553,7 @@ export default function TransactionsPage() {
               </div>
               <div>
                 <Label className="text-foreground text-sm">
-                  {t("transactions.priceLabel")} ({addForm.currency}) *
+                  Price ({addForm.currency}) *
                 </Label>
                 <Input
                   type="number"
@@ -599,7 +571,7 @@ export default function TransactionsPage() {
             </div>
             <div>
               <Label className="text-foreground text-sm">
-                {t("transactions.feeLabel")} ({addForm.currency})
+                Fee ({addForm.currency})
               </Label>
               <Input
                 type="number"
@@ -614,38 +586,34 @@ export default function TransactionsPage() {
               />
             </div>
             <div>
-              <Label className="text-foreground text-sm">
-                {t("transactions.noteLabel")}
-              </Label>
+              <Label className="text-foreground text-sm">Note</Label>
               <Input
                 value={addForm.note}
                 onChange={(e) =>
                   setAddForm((p) => ({ ...p, note: e.target.value }))
                 }
-                placeholder={t("common.optional")}
+                placeholder="Optional note"
                 className="mt-1 bg-muted border-border"
                 data-ocid="transactions.note.input"
               />
             </div>
-            <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
+            <DialogFooter>
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => setDialogOpen(false)}
-                className="text-muted-foreground w-full sm:w-auto"
+                className="text-muted-foreground"
                 data-ocid="transactions.cancel_button"
               >
-                {t("common.cancel")}
+                Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={addTransaction.isPending}
-                className="bg-fin-green text-background hover:bg-fin-green/90 w-full sm:w-auto"
+                className="bg-fin-green text-background hover:bg-fin-green/90"
                 data-ocid="transactions.submit_button"
               >
-                {addTransaction.isPending
-                  ? t("transactions.addingTx")
-                  : t("transactions.addTransaction")}
+                {addTransaction.isPending ? "Adding..." : "Add Transaction"}
               </Button>
             </DialogFooter>
           </form>
@@ -658,13 +626,13 @@ export default function TransactionsPage() {
         onOpenChange={(o) => !o && closeEdit()}
       >
         <DialogContent
-          className="bg-card border-border w-full max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[90vh] overflow-y-auto"
+          className="bg-card border-border max-w-md"
           data-ocid="transactions.edit_dialog"
         >
           <DialogHeader>
             <div className="flex items-center gap-2">
               <DialogTitle className="text-foreground">
-                {t("transactions.editTransaction")}
+                Sửa giao dịch
               </DialogTitle>
               {editingTransaction && (
                 <TxTypeBadge txType={editingTransaction.txType} />
@@ -674,9 +642,7 @@ export default function TransactionsPage() {
           <form onSubmit={handleEditSubmit} className="space-y-4">
             {/* Asset — read-only */}
             <div>
-              <Label className="text-foreground text-sm">
-                {t("transactions.assetLabel")}
-              </Label>
+              <Label className="text-foreground text-sm">Asset</Label>
               <div className="mt-1 w-full h-10 px-3 rounded-md bg-muted/50 border border-border text-muted-foreground text-sm flex items-center font-mono font-bold">
                 {editingTransaction
                   ? (assetMap.get(editingTransaction.assetId.toString()) ?? "—")
@@ -685,9 +651,7 @@ export default function TransactionsPage() {
             </div>
 
             <div>
-              <Label className="text-foreground text-sm">
-                {t("transactions.currencyLabel")} *
-              </Label>
+              <Label className="text-foreground text-sm">Currency *</Label>
               <CurrencySelect
                 value={editForm.currency}
                 onChange={(v) => setEditForm((p) => ({ ...p, currency: v }))}
@@ -695,16 +659,14 @@ export default function TransactionsPage() {
               />
               {editForm.currency === "VND" && (
                 <p className="text-[11px] text-fin-green mt-1">
-                  {t("transactions.vndNoteEdit")}
+                  🇻🇳 Vietnamese Dong — giá theo đơn vị VND
                 </p>
               )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-foreground text-sm">
-                  {t("transactions.typeLabel")} *
-                </Label>
+                <Label className="text-foreground text-sm">Type *</Label>
                 <select
                   value={editForm.txType}
                   onChange={(e) =>
@@ -716,18 +678,14 @@ export default function TransactionsPage() {
                   className="mt-1 w-full h-10 px-3 rounded-md bg-muted border border-border text-foreground text-sm focus:outline-none focus:border-fin-green/50"
                   data-ocid="transactions.edit.type.select"
                 >
-                  <option value={TxType.Buy}>{t("badges.Buy")}</option>
-                  <option value={TxType.Sell}>{t("badges.Sell")}</option>
-                  <option value={TxType.Deposit}>{t("badges.Deposit")}</option>
-                  <option value={TxType.Withdraw}>
-                    {t("badges.Withdraw")}
-                  </option>
+                  <option value={TxType.Buy}>Buy</option>
+                  <option value={TxType.Sell}>Sell</option>
+                  <option value={TxType.Deposit}>Deposit</option>
+                  <option value={TxType.Withdraw}>Withdraw</option>
                 </select>
               </div>
               <div>
-                <Label className="text-foreground text-sm">
-                  {t("transactions.dateLabel")} *
-                </Label>
+                <Label className="text-foreground text-sm">Date *</Label>
                 <Input
                   type="date"
                   value={editForm.date}
@@ -743,9 +701,7 @@ export default function TransactionsPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-foreground text-sm">
-                  {t("transactions.quantityLabel")} *
-                </Label>
+                <Label className="text-foreground text-sm">Quantity *</Label>
                 <Input
                   type="number"
                   step="any"
@@ -761,7 +717,7 @@ export default function TransactionsPage() {
               </div>
               <div>
                 <Label className="text-foreground text-sm">
-                  {t("transactions.priceLabel")} ({editForm.currency}) *
+                  Price ({editForm.currency}) *
                 </Label>
                 <Input
                   type="number"
@@ -780,7 +736,7 @@ export default function TransactionsPage() {
 
             <div>
               <Label className="text-foreground text-sm">
-                {t("transactions.feeLabel")} ({editForm.currency})
+                Fee ({editForm.currency})
               </Label>
               <Input
                 type="number"
@@ -796,39 +752,35 @@ export default function TransactionsPage() {
             </div>
 
             <div>
-              <Label className="text-foreground text-sm">
-                {t("transactions.noteLabel")}
-              </Label>
+              <Label className="text-foreground text-sm">Note</Label>
               <Input
                 value={editForm.note}
                 onChange={(e) =>
                   setEditForm((p) => ({ ...p, note: e.target.value }))
                 }
-                placeholder={t("common.optional")}
+                placeholder="Optional note"
                 className="mt-1 bg-muted border-border"
                 data-ocid="transactions.edit.note.input"
               />
             </div>
 
-            <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
+            <DialogFooter>
               <Button
                 type="button"
                 variant="ghost"
                 onClick={closeEdit}
-                className="text-muted-foreground w-full sm:w-auto"
+                className="text-muted-foreground"
                 data-ocid="transactions.edit.cancel_button"
               >
-                {t("transactions.cancelBtn")}
+                Hủy
               </Button>
               <Button
                 type="submit"
                 disabled={updateTransaction.isPending}
-                className="bg-fin-green text-background hover:bg-fin-green/90 w-full sm:w-auto"
+                className="bg-fin-green text-background hover:bg-fin-green/90"
                 data-ocid="transactions.edit.submit_button"
               >
-                {updateTransaction.isPending
-                  ? t("transactions.savingBtn")
-                  : t("transactions.saveChanges")}
+                {updateTransaction.isPending ? "Đang lưu..." : "Lưu thay đổi"}
               </Button>
             </DialogFooter>
           </form>
@@ -840,17 +792,17 @@ export default function TransactionsPage() {
         open={!!deleteTarget}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
       >
-        <AlertDialogContent className="bg-card border-border w-full max-w-[calc(100vw-2rem)] sm:max-w-sm">
+        <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-foreground">
-              {t("transactions.deleteTitle")}
+              Delete Transaction
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {t("transactions.deleteDesc")}{" "}
+              Are you sure you want to delete this{" "}
               <strong className="text-foreground">
                 {deleteTarget?.txType}
               </strong>{" "}
-              {t("transactions.deleteDescSuffix")}
+              transaction? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -858,16 +810,14 @@ export default function TransactionsPage() {
               className="border-border"
               data-ocid="transactions.delete.cancel_button"
             >
-              {t("common.cancel")}
+              Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-ocid="transactions.delete.confirm_button"
             >
-              {deleteTransaction.isPending
-                ? t("common.deleting")
-                : t("common.delete")}
+              {deleteTransaction.isPending ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

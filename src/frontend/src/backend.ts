@@ -89,30 +89,10 @@ export class ExternalBlob {
         return this;
     }
 }
-export interface Public__2 {
-    id: bigint;
-    totalValue: number;
-    date: bigint;
-    createdAt: bigint;
-}
 export interface TransformationOutput {
     status: bigint;
     body: Uint8Array;
     headers: Array<http_header>;
-}
-export interface TransactionImport {
-    fee: number;
-    assetId: bigint;
-    date: bigint;
-    note: string;
-    currency: string;
-    quantity: number;
-    txType: TxType;
-    price: number;
-}
-export interface PortfolioImportInput {
-    assets: Array<AssetImport>;
-    transactions: Array<TransactionImport>;
 }
 export interface PortfolioSummary {
     totalValue: number;
@@ -131,39 +111,20 @@ export interface StockSearchResult {
     exchange: string;
     symbol: string;
 }
-export interface Public__3 {
-    id: bigint;
-    fee: number;
-    assetId: bigint;
-    date: bigint;
-    note: string;
-    createdAt: bigint;
-    currency: string;
-    quantity: number;
-    txType: TxType;
-    price: number;
-}
 export interface Public {
     baseCurrency: string;
     displayName: string;
     createdAt: bigint;
     user: Principal;
 }
-export interface PortfolioExport {
-    assets: Array<Public__1>;
-    snapshots: Array<Public__2>;
-    exportedAt: bigint;
-    transactions: Array<Public__3>;
-    profile?: Public;
-}
-export interface MetalPrice {
-    currency: string;
-    timestamp: bigint;
-    price: number;
-}
 export interface http_header {
     value: string;
     name: string;
+}
+export interface http_request_result {
+    status: bigint;
+    body: Uint8Array;
+    headers: Array<http_header>;
 }
 export interface Transaction {
     id: bigint;
@@ -176,16 +137,6 @@ export interface Transaction {
     quantity: number;
     txType: TxType;
     price: number;
-}
-export interface http_request_result {
-    status: bigint;
-    body: Uint8Array;
-    headers: Array<http_header>;
-}
-export interface ImportResult {
-    assetsSkipped: bigint;
-    assetsImported: bigint;
-    transactionsImported: bigint;
 }
 export interface StockPrice {
     ok: boolean;
@@ -239,19 +190,9 @@ export interface AddTransactionInput {
     txType: TxType;
     price: number;
 }
-export interface AssetImport {
-    name: string;
-    note: string;
-    currency: string;
-    category: Category;
-    manualPrice: number;
-    symbol: string;
-}
 export enum Category {
     Stock = "Stock",
-    RealEstate = "RealEstate",
     Cash = "Cash",
-    Commodity = "Commodity",
     Forex = "Forex",
     Crypto = "Crypto"
 }
@@ -274,7 +215,6 @@ export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     deleteAsset(id: bigint): Promise<void>;
     deleteTransaction(id: bigint): Promise<void>;
-    exportPortfolioData(): Promise<PortfolioExport>;
     getAsset(id: bigint): Promise<Public__1 | null>;
     getAssets(): Promise<Array<Public__1>>;
     getCallerUserProfile(): Promise<Public | null>;
@@ -282,8 +222,6 @@ export interface backendInterface {
     getExchangeRates(): Promise<Array<[string, number]>>;
     getHoldings(): Promise<Array<Holding>>;
     getHoldingsInCurrency(targetCurrency: string): Promise<Array<Holding>>;
-    getMetalPrice(): Promise<MetalPrice>;
-    getMetalPriceBySymbol(symbol: string): Promise<MetalPrice>;
     getPortfolioSummary(): Promise<PortfolioSummary>;
     getPortfolioSummaryInCurrency(targetCurrency: string): Promise<PortfolioSummary>;
     getProfile(): Promise<Public | null>;
@@ -292,18 +230,16 @@ export interface backendInterface {
     getTransaction(id: bigint): Promise<Transaction | null>;
     getTransactions(): Promise<Array<Transaction>>;
     getUserProfile(user: Principal): Promise<Public | null>;
-    importPortfolioData(data: PortfolioImportInput): Promise<ImportResult>;
     isCallerAdmin(): Promise<boolean>;
     saveCallerUserProfile(profile: Public): Promise<void>;
     searchStocks(searchTerm: string): Promise<Array<StockSearchResult>>;
     transform(input: TransformationInput): Promise<TransformationOutput>;
-    transformMetal(input: TransformationInput): Promise<TransformationOutput>;
     transformSearch(input: TransformationInput): Promise<TransformationOutput>;
     updateAsset(asset: Public__1): Promise<void>;
     updateProfile(profile: Public): Promise<void>;
     updateTransaction(tx: AddTransactionInput): Promise<void>;
 }
-import type { AddTransactionInput as _AddTransactionInput, AssetImport as _AssetImport, Category as _Category, Holding as _Holding, PortfolioExport as _PortfolioExport, PortfolioImportInput as _PortfolioImportInput, PortfolioSummary as _PortfolioSummary, Public as _Public, Public__1 as _Public__1, Public__2 as _Public__2, Public__3 as _Public__3, Transaction as _Transaction, TransactionImport as _TransactionImport, TxType as _TxType, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
+import type { AddTransactionInput as _AddTransactionInput, Category as _Category, Holding as _Holding, PortfolioSummary as _PortfolioSummary, Public as _Public, Public__1 as _Public__1, Transaction as _Transaction, TxType as _TxType, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async _initializeAccessControl(): Promise<void> {
@@ -404,74 +340,60 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async exportPortfolioData(): Promise<PortfolioExport> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.exportPortfolioData();
-                return from_candid_PortfolioExport_n11(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.exportPortfolioData();
-            return from_candid_PortfolioExport_n11(this._uploadFile, this._downloadFile, result);
-        }
-    }
     async getAsset(arg0: bigint): Promise<Public__1 | null> {
         if (this.processError) {
             try {
                 const result = await this.actor.getAsset(arg0);
-                return from_candid_opt_n24(this._uploadFile, this._downloadFile, result);
+                return from_candid_opt_n11(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getAsset(arg0);
-            return from_candid_opt_n24(this._uploadFile, this._downloadFile, result);
+            return from_candid_opt_n11(this._uploadFile, this._downloadFile, result);
         }
     }
     async getAssets(): Promise<Array<Public__1>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getAssets();
-                return from_candid_vec_n13(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n16(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getAssets();
-            return from_candid_vec_n13(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n16(this._uploadFile, this._downloadFile, result);
         }
     }
     async getCallerUserProfile(): Promise<Public | null> {
         if (this.processError) {
             try {
                 const result = await this.actor.getCallerUserProfile();
-                return from_candid_opt_n23(this._uploadFile, this._downloadFile, result);
+                return from_candid_opt_n17(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getCallerUserProfile();
-            return from_candid_opt_n23(this._uploadFile, this._downloadFile, result);
+            return from_candid_opt_n17(this._uploadFile, this._downloadFile, result);
         }
     }
     async getCallerUserRole(): Promise<UserRole> {
         if (this.processError) {
             try {
                 const result = await this.actor.getCallerUserRole();
-                return from_candid_UserRole_n25(this._uploadFile, this._downloadFile, result);
+                return from_candid_UserRole_n18(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getCallerUserRole();
-            return from_candid_UserRole_n25(this._uploadFile, this._downloadFile, result);
+            return from_candid_UserRole_n18(this._uploadFile, this._downloadFile, result);
         }
     }
     async getExchangeRates(): Promise<Array<[string, number]>> {
@@ -492,98 +414,70 @@ export class Backend implements backendInterface {
         if (this.processError) {
             try {
                 const result = await this.actor.getHoldings();
-                return from_candid_vec_n27(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n20(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getHoldings();
-            return from_candid_vec_n27(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n20(this._uploadFile, this._downloadFile, result);
         }
     }
     async getHoldingsInCurrency(arg0: string): Promise<Array<Holding>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getHoldingsInCurrency(arg0);
-                return from_candid_vec_n27(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n20(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getHoldingsInCurrency(arg0);
-            return from_candid_vec_n27(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async getMetalPrice(): Promise<MetalPrice> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getMetalPrice();
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getMetalPrice();
-            return result;
-        }
-    }
-    async getMetalPriceBySymbol(arg0: string): Promise<MetalPrice> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getMetalPriceBySymbol(arg0);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getMetalPriceBySymbol(arg0);
-            return result;
+            return from_candid_vec_n20(this._uploadFile, this._downloadFile, result);
         }
     }
     async getPortfolioSummary(): Promise<PortfolioSummary> {
         if (this.processError) {
             try {
                 const result = await this.actor.getPortfolioSummary();
-                return from_candid_PortfolioSummary_n30(this._uploadFile, this._downloadFile, result);
+                return from_candid_PortfolioSummary_n23(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getPortfolioSummary();
-            return from_candid_PortfolioSummary_n30(this._uploadFile, this._downloadFile, result);
+            return from_candid_PortfolioSummary_n23(this._uploadFile, this._downloadFile, result);
         }
     }
     async getPortfolioSummaryInCurrency(arg0: string): Promise<PortfolioSummary> {
         if (this.processError) {
             try {
                 const result = await this.actor.getPortfolioSummaryInCurrency(arg0);
-                return from_candid_PortfolioSummary_n30(this._uploadFile, this._downloadFile, result);
+                return from_candid_PortfolioSummary_n23(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getPortfolioSummaryInCurrency(arg0);
-            return from_candid_PortfolioSummary_n30(this._uploadFile, this._downloadFile, result);
+            return from_candid_PortfolioSummary_n23(this._uploadFile, this._downloadFile, result);
         }
     }
     async getProfile(): Promise<Public | null> {
         if (this.processError) {
             try {
                 const result = await this.actor.getProfile();
-                return from_candid_opt_n23(this._uploadFile, this._downloadFile, result);
+                return from_candid_opt_n17(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getProfile();
-            return from_candid_opt_n23(this._uploadFile, this._downloadFile, result);
+            return from_candid_opt_n17(this._uploadFile, this._downloadFile, result);
         }
     }
     async getSnapshots(arg0: bigint, arg1: bigint): Promise<Array<PortfolioSnapshot>> {
@@ -618,56 +512,42 @@ export class Backend implements backendInterface {
         if (this.processError) {
             try {
                 const result = await this.actor.getTransaction(arg0);
-                return from_candid_opt_n34(this._uploadFile, this._downloadFile, result);
+                return from_candid_opt_n27(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getTransaction(arg0);
-            return from_candid_opt_n34(this._uploadFile, this._downloadFile, result);
+            return from_candid_opt_n27(this._uploadFile, this._downloadFile, result);
         }
     }
     async getTransactions(): Promise<Array<Transaction>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getTransactions();
-                return from_candid_vec_n36(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n32(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getTransactions();
-            return from_candid_vec_n36(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n32(this._uploadFile, this._downloadFile, result);
         }
     }
     async getUserProfile(arg0: Principal): Promise<Public | null> {
         if (this.processError) {
             try {
                 const result = await this.actor.getUserProfile(arg0);
-                return from_candid_opt_n23(this._uploadFile, this._downloadFile, result);
+                return from_candid_opt_n17(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getUserProfile(arg0);
-            return from_candid_opt_n23(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async importPortfolioData(arg0: PortfolioImportInput): Promise<ImportResult> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.importPortfolioData(to_candid_PortfolioImportInput_n37(this._uploadFile, this._downloadFile, arg0));
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.importPortfolioData(to_candid_PortfolioImportInput_n37(this._uploadFile, this._downloadFile, arg0));
-            return result;
+            return from_candid_opt_n17(this._uploadFile, this._downloadFile, result);
         }
     }
     async isCallerAdmin(): Promise<boolean> {
@@ -723,20 +603,6 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.transform(arg0);
-            return result;
-        }
-    }
-    async transformMetal(arg0: TransformationInput): Promise<TransformationOutput> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.transformMetal(arg0);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.transformMetal(arg0);
             return result;
         }
     }
@@ -797,64 +663,37 @@ export class Backend implements backendInterface {
         }
     }
 }
-function from_candid_Category_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Category): Category {
-    return from_candid_variant_n17(_uploadFile, _downloadFile, value);
+function from_candid_Category_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Category): Category {
+    return from_candid_variant_n15(_uploadFile, _downloadFile, value);
 }
-function from_candid_Holding_n28(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Holding): Holding {
+function from_candid_Holding_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Holding): Holding {
+    return from_candid_record_n22(_uploadFile, _downloadFile, value);
+}
+function from_candid_PortfolioSummary_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _PortfolioSummary): PortfolioSummary {
+    return from_candid_record_n24(_uploadFile, _downloadFile, value);
+}
+function from_candid_Public__1_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Public__1): Public__1 {
+    return from_candid_record_n13(_uploadFile, _downloadFile, value);
+}
+function from_candid_Transaction_n28(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Transaction): Transaction {
     return from_candid_record_n29(_uploadFile, _downloadFile, value);
 }
-function from_candid_PortfolioExport_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _PortfolioExport): PortfolioExport {
-    return from_candid_record_n12(_uploadFile, _downloadFile, value);
+function from_candid_TxType_n30(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _TxType): TxType {
+    return from_candid_variant_n31(_uploadFile, _downloadFile, value);
 }
-function from_candid_PortfolioSummary_n30(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _PortfolioSummary): PortfolioSummary {
-    return from_candid_record_n31(_uploadFile, _downloadFile, value);
+function from_candid_UserRole_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
+    return from_candid_variant_n19(_uploadFile, _downloadFile, value);
 }
-function from_candid_Public__1_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Public__1): Public__1 {
-    return from_candid_record_n15(_uploadFile, _downloadFile, value);
+function from_candid_opt_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Public__1]): Public__1 | null {
+    return value.length === 0 ? null : from_candid_Public__1_n12(_uploadFile, _downloadFile, value[0]);
 }
-function from_candid_Public__3_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Public__3): Public__3 {
-    return from_candid_record_n20(_uploadFile, _downloadFile, value);
-}
-function from_candid_Transaction_n35(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Transaction): Transaction {
-    return from_candid_record_n20(_uploadFile, _downloadFile, value);
-}
-function from_candid_TxType_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _TxType): TxType {
-    return from_candid_variant_n22(_uploadFile, _downloadFile, value);
-}
-function from_candid_UserRole_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
-    return from_candid_variant_n26(_uploadFile, _downloadFile, value);
-}
-function from_candid_opt_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Public]): Public | null {
+function from_candid_opt_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Public]): Public | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_opt_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Public__1]): Public__1 | null {
-    return value.length === 0 ? null : from_candid_Public__1_n14(_uploadFile, _downloadFile, value[0]);
+function from_candid_opt_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Transaction]): Transaction | null {
+    return value.length === 0 ? null : from_candid_Transaction_n28(_uploadFile, _downloadFile, value[0]);
 }
-function from_candid_opt_n34(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Transaction]): Transaction | null {
-    return value.length === 0 ? null : from_candid_Transaction_n35(_uploadFile, _downloadFile, value[0]);
-}
-function from_candid_record_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    assets: Array<_Public__1>;
-    snapshots: Array<_Public__2>;
-    exportedAt: bigint;
-    transactions: Array<_Public__3>;
-    profile: [] | [_Public];
-}): {
-    assets: Array<Public__1>;
-    snapshots: Array<Public__2>;
-    exportedAt: bigint;
-    transactions: Array<Public__3>;
-    profile?: Public;
-} {
-    return {
-        assets: from_candid_vec_n13(_uploadFile, _downloadFile, value.assets),
-        snapshots: value.snapshots,
-        exportedAt: value.exportedAt,
-        transactions: from_candid_vec_n18(_uploadFile, _downloadFile, value.transactions),
-        profile: record_opt_to_undefined(from_candid_opt_n23(_uploadFile, _downloadFile, value.profile))
-    };
-}
-function from_candid_record_n15(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_record_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: bigint;
     name: string;
     note: string;
@@ -879,48 +718,12 @@ function from_candid_record_n15(_uploadFile: (file: ExternalBlob) => Promise<Uin
         note: value.note,
         createdAt: value.createdAt,
         currency: value.currency,
-        category: from_candid_Category_n16(_uploadFile, _downloadFile, value.category),
+        category: from_candid_Category_n14(_uploadFile, _downloadFile, value.category),
         manualPrice: value.manualPrice,
         symbol: value.symbol
     };
 }
-function from_candid_record_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    id: bigint;
-    fee: number;
-    assetId: bigint;
-    date: bigint;
-    note: string;
-    createdAt: bigint;
-    currency: string;
-    quantity: number;
-    txType: _TxType;
-    price: number;
-}): {
-    id: bigint;
-    fee: number;
-    assetId: bigint;
-    date: bigint;
-    note: string;
-    createdAt: bigint;
-    currency: string;
-    quantity: number;
-    txType: TxType;
-    price: number;
-} {
-    return {
-        id: value.id,
-        fee: value.fee,
-        assetId: value.assetId,
-        date: value.date,
-        note: value.note,
-        createdAt: value.createdAt,
-        currency: value.currency,
-        quantity: value.quantity,
-        txType: from_candid_TxType_n21(_uploadFile, _downloadFile, value.txType),
-        price: value.price
-    };
-}
-function from_candid_record_n29(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_record_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     currentPrice: number;
     assetId: bigint;
     totalValue: number;
@@ -957,12 +760,12 @@ function from_candid_record_n29(_uploadFile: (file: ExternalBlob) => Promise<Uin
         averageCost: value.averageCost,
         currency: value.currency,
         quantity: value.quantity,
-        category: from_candid_Category_n16(_uploadFile, _downloadFile, value.category),
+        category: from_candid_Category_n14(_uploadFile, _downloadFile, value.category),
         gainLossPercent: value.gainLossPercent,
         symbol: value.symbol
     };
 }
-function from_candid_record_n31(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_record_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     totalValue: number;
     totalCost: number;
     dailyChange: number;
@@ -990,11 +793,11 @@ function from_candid_record_n31(_uploadFile: (file: ExternalBlob) => Promise<Uin
         totalCost: value.totalCost,
         dailyChange: value.dailyChange,
         totalGainLoss: value.totalGainLoss,
-        allocation: from_candid_vec_n32(_uploadFile, _downloadFile, value.allocation),
+        allocation: from_candid_vec_n25(_uploadFile, _downloadFile, value.allocation),
         totalGainLossPercent: value.totalGainLossPercent
     };
 }
-function from_candid_record_n33(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_record_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     value: number;
     category: _Category;
     percentage: number;
@@ -1005,26 +808,67 @@ function from_candid_record_n33(_uploadFile: (file: ExternalBlob) => Promise<Uin
 } {
     return {
         value: value.value,
-        category: from_candid_Category_n16(_uploadFile, _downloadFile, value.category),
+        category: from_candid_Category_n14(_uploadFile, _downloadFile, value.category),
         percentage: value.percentage
     };
 }
-function from_candid_variant_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_record_n29(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    id: bigint;
+    fee: number;
+    assetId: bigint;
+    date: bigint;
+    note: string;
+    createdAt: bigint;
+    currency: string;
+    quantity: number;
+    txType: _TxType;
+    price: number;
+}): {
+    id: bigint;
+    fee: number;
+    assetId: bigint;
+    date: bigint;
+    note: string;
+    createdAt: bigint;
+    currency: string;
+    quantity: number;
+    txType: TxType;
+    price: number;
+} {
+    return {
+        id: value.id,
+        fee: value.fee,
+        assetId: value.assetId,
+        date: value.date,
+        note: value.note,
+        createdAt: value.createdAt,
+        currency: value.currency,
+        quantity: value.quantity,
+        txType: from_candid_TxType_n30(_uploadFile, _downloadFile, value.txType),
+        price: value.price
+    };
+}
+function from_candid_variant_n15(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     Stock: null;
 } | {
-    RealEstate: null;
-} | {
     Cash: null;
-} | {
-    Commodity: null;
 } | {
     Forex: null;
 } | {
     Crypto: null;
 }): Category {
-    return "Stock" in value ? Category.Stock : "RealEstate" in value ? Category.RealEstate : "Cash" in value ? Category.Cash : "Commodity" in value ? Category.Commodity : "Forex" in value ? Category.Forex : "Crypto" in value ? Category.Crypto : value;
+    return "Stock" in value ? Category.Stock : "Cash" in value ? Category.Cash : "Forex" in value ? Category.Forex : "Crypto" in value ? Category.Crypto : value;
 }
-function from_candid_variant_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    admin: null;
+} | {
+    user: null;
+} | {
+    guest: null;
+}): UserRole {
+    return "admin" in value ? UserRole.admin : "user" in value ? UserRole.user : "guest" in value ? UserRole.guest : value;
+}
+function from_candid_variant_n31(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     Buy: null;
 } | {
     Withdraw: null;
@@ -1035,25 +879,13 @@ function from_candid_variant_n22(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): TxType {
     return "Buy" in value ? TxType.Buy : "Withdraw" in value ? TxType.Withdraw : "Deposit" in value ? TxType.Deposit : "Sell" in value ? TxType.Sell : value;
 }
-function from_candid_variant_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    admin: null;
-} | {
-    user: null;
-} | {
-    guest: null;
-}): UserRole {
-    return "admin" in value ? UserRole.admin : "user" in value ? UserRole.user : "guest" in value ? UserRole.guest : value;
+function from_candid_vec_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Public__1>): Array<Public__1> {
+    return value.map((x)=>from_candid_Public__1_n12(_uploadFile, _downloadFile, x));
 }
-function from_candid_vec_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Public__1>): Array<Public__1> {
-    return value.map((x)=>from_candid_Public__1_n14(_uploadFile, _downloadFile, x));
+function from_candid_vec_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Holding>): Array<Holding> {
+    return value.map((x)=>from_candid_Holding_n21(_uploadFile, _downloadFile, x));
 }
-function from_candid_vec_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Public__3>): Array<Public__3> {
-    return value.map((x)=>from_candid_Public__3_n19(_uploadFile, _downloadFile, x));
-}
-function from_candid_vec_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Holding>): Array<Holding> {
-    return value.map((x)=>from_candid_Holding_n28(_uploadFile, _downloadFile, x));
-}
-function from_candid_vec_n32(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<{
+function from_candid_vec_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<{
     value: number;
     category: _Category;
     percentage: number;
@@ -1062,28 +894,19 @@ function from_candid_vec_n32(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
     category: Category;
     percentage: number;
 }> {
-    return value.map((x)=>from_candid_record_n33(_uploadFile, _downloadFile, x));
+    return value.map((x)=>from_candid_record_n26(_uploadFile, _downloadFile, x));
 }
-function from_candid_vec_n36(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Transaction>): Array<Transaction> {
-    return value.map((x)=>from_candid_Transaction_n35(_uploadFile, _downloadFile, x));
+function from_candid_vec_n32(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Transaction>): Array<Transaction> {
+    return value.map((x)=>from_candid_Transaction_n28(_uploadFile, _downloadFile, x));
 }
 function to_candid_AddTransactionInput_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: AddTransactionInput): _AddTransactionInput {
     return to_candid_record_n6(_uploadFile, _downloadFile, value);
 }
-function to_candid_AssetImport_n40(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: AssetImport): _AssetImport {
-    return to_candid_record_n41(_uploadFile, _downloadFile, value);
-}
 function to_candid_Category_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Category): _Category {
     return to_candid_variant_n4(_uploadFile, _downloadFile, value);
 }
-function to_candid_PortfolioImportInput_n37(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: PortfolioImportInput): _PortfolioImportInput {
-    return to_candid_record_n38(_uploadFile, _downloadFile, value);
-}
 function to_candid_Public__1_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Public__1): _Public__1 {
     return to_candid_record_n2(_uploadFile, _downloadFile, value);
-}
-function to_candid_TransactionImport_n43(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: TransactionImport): _TransactionImport {
-    return to_candid_record_n44(_uploadFile, _downloadFile, value);
 }
 function to_candid_TxType_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: TxType): _TxType {
     return to_candid_variant_n8(_uploadFile, _downloadFile, value);
@@ -1119,72 +942,6 @@ function to_candid_record_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
         category: to_candid_Category_n3(_uploadFile, _downloadFile, value.category),
         manualPrice: value.manualPrice,
         symbol: value.symbol
-    };
-}
-function to_candid_record_n38(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    assets: Array<AssetImport>;
-    transactions: Array<TransactionImport>;
-}): {
-    assets: Array<_AssetImport>;
-    transactions: Array<_TransactionImport>;
-} {
-    return {
-        assets: to_candid_vec_n39(_uploadFile, _downloadFile, value.assets),
-        transactions: to_candid_vec_n42(_uploadFile, _downloadFile, value.transactions)
-    };
-}
-function to_candid_record_n41(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    name: string;
-    note: string;
-    currency: string;
-    category: Category;
-    manualPrice: number;
-    symbol: string;
-}): {
-    name: string;
-    note: string;
-    currency: string;
-    category: _Category;
-    manualPrice: number;
-    symbol: string;
-} {
-    return {
-        name: value.name,
-        note: value.note,
-        currency: value.currency,
-        category: to_candid_Category_n3(_uploadFile, _downloadFile, value.category),
-        manualPrice: value.manualPrice,
-        symbol: value.symbol
-    };
-}
-function to_candid_record_n44(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    fee: number;
-    assetId: bigint;
-    date: bigint;
-    note: string;
-    currency: string;
-    quantity: number;
-    txType: TxType;
-    price: number;
-}): {
-    fee: number;
-    assetId: bigint;
-    date: bigint;
-    note: string;
-    currency: string;
-    quantity: number;
-    txType: _TxType;
-    price: number;
-} {
-    return {
-        fee: value.fee,
-        assetId: value.assetId,
-        date: value.date,
-        note: value.note,
-        currency: value.currency,
-        quantity: value.quantity,
-        txType: to_candid_TxType_n7(_uploadFile, _downloadFile, value.txType),
-        price: value.price
     };
 }
 function to_candid_record_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
@@ -1241,11 +998,7 @@ function to_candid_variant_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint
 function to_candid_variant_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Category): {
     Stock: null;
 } | {
-    RealEstate: null;
-} | {
     Cash: null;
-} | {
-    Commodity: null;
 } | {
     Forex: null;
 } | {
@@ -1253,12 +1006,8 @@ function to_candid_variant_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8
 } {
     return value == Category.Stock ? {
         Stock: null
-    } : value == Category.RealEstate ? {
-        RealEstate: null
     } : value == Category.Cash ? {
         Cash: null
-    } : value == Category.Commodity ? {
-        Commodity: null
     } : value == Category.Forex ? {
         Forex: null
     } : value == Category.Crypto ? {
@@ -1283,12 +1032,6 @@ function to_candid_variant_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8
     } : value == TxType.Sell ? {
         Sell: null
     } : value;
-}
-function to_candid_vec_n39(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<AssetImport>): Array<_AssetImport> {
-    return value.map((x)=>to_candid_AssetImport_n40(_uploadFile, _downloadFile, x));
-}
-function to_candid_vec_n42(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<TransactionImport>): Array<_TransactionImport> {
-    return value.map((x)=>to_candid_TransactionImport_n43(_uploadFile, _downloadFile, x));
 }
 export interface CreateActorOptions {
     agent?: Agent;
